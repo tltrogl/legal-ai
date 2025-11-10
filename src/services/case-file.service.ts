@@ -22,12 +22,13 @@ export class CaseFileService {
     return files.find(file => file.id === id);
   }
 
-  saveNewCase(caseFile: Omit<CaseFile, 'id' | 'motions' | 'createdAt' | 'updatedAt'>): CaseFile {
+  saveNewCase(caseFile: Omit<CaseFile, 'id' | 'motions' | 'discoveryDocuments' | 'createdAt' | 'updatedAt'>): CaseFile {
     const files = this.getCaseFiles();
     const newCase: CaseFile = {
       ...caseFile,
       id: self.crypto.randomUUID(),
       motions: [],
+      discoveryDocuments: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };

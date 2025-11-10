@@ -1,4 +1,3 @@
-
 import { Injectable } from '@angular/core';
 import { GoogleGenAI, GenerateContentResponse } from '@google/genai';
 import { ChatMessage } from '../models/chat.model';
@@ -52,6 +51,45 @@ export class GeminiService {
         model,
         contents: { parts: [promptPart, mediaPart] }
     });
+  }
+
+  async analyzeDiscoveryEvidence(
+    caseContext: string,
+    prompt: string,
+    fileContent: string, // Can be base64 or plain text
+    mimeType: string
+  ): Promise<GenerateContentResponse> {
+    const systemInstruction = `You are an expert paralegal analyzing a piece of discovery evidence in the context of a legal case.
+    Case Summary:
+    ---
+    ${caseContext}
+    ---
+    Your task is to analyze the provided evidence (text, image, or video) based on the user's specific prompt. Be thorough, objective, and highlight legally significant details.`;
+
+    if (mimeType.startsWith('image/') || mimeType.startsWith('video/')) {
+      const model = mimeType.startsWith('video/') ? 'gemini-2.5-pro' : 'gemini-2.5-flash';
+      const parts = [
+        { text: prompt },
+        { inlineData: { mimeType, data: fileContent } }
+      ];
+      return this.ai.models.generateContent({
+        model,
+        contents: { parts },
+        config: { systemInstruction }
+      });
+    } else { // Text or PDF content
+      const model = 'gemini-2.5-pro';
+      const fullPrompt = `Evidence Document Content:\n\n---\n${fileContent}\n---\n\nUser's Analysis Request: "${prompt}"`;
+      
+      return this.ai.models.generateContent({
+        model,
+        contents: fullPrompt,
+        config: {
+          systemInstruction,
+          thinkingConfig: { thinkingBudget: 32768 }
+        }
+      });
+    }
   }
 
   async performLegalResearch(query: string, documentContext?: string): Promise<GenerateContentResponse> {

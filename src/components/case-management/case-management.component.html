@@ -61,6 +61,7 @@
 
   @if (view() === 'workspace' && activeCase(); as currentCase) {
     <div class="flex flex-col h-full">
+      <!-- Header -->
       <div class="flex justify-between items-center mb-4 pb-4 border-b">
         <div>
           <h2 class="text-2xl font-bold text-slate-800">{{ currentCase.name }}</h2>
@@ -73,76 +74,191 @@
         </button>
       </div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 flex-grow overflow-hidden">
-        <!-- Left Panel: History and Generation -->
-        <div class="lg:col-span-1 flex flex-col space-y-4 overflow-y-auto pr-2">
-           <div>
-              <h3 class="font-semibold text-slate-700 mb-2">Generate New Motion</h3>
-              <div class="space-y-3 p-4 bg-white rounded-lg shadow">
-                <div>
-                  <label for="motion-type" class="block text-sm font-medium text-slate-700">Motion Type</label>
-                  <select id="motion-type" [(ngModel)]="motionType" name="motion-type" class="mt-1 block w-full input">
-                    <option>Motion to Suppress Evidence</option>
-                    <option>Motion to Dismiss</option>
-                    <option>Motion to Compel Discovery</option>
-                    <option>Motion for a Bill of Particulars</option>
-                    <option>Motion for a Change of Venue</option>
-                  </select>
-                </div>
-                <div>
-                  <label for="factual-basis" class="block text-sm font-medium text-slate-700">Factual Basis for Motion</label>
-                  <textarea id="factual-basis" [(ngModel)]="factualBasis" name="factual-basis" rows="6" required class="mt-1 block w-full input" placeholder="Describe the specific facts..."></textarea>
-                </div>
-                <button (click)="generateMotion()" [disabled]="loading() || !factualBasis().trim()" class="w-full btn-primary flex items-center justify-center">
-                  @if(loading()) {
-                    <div class="spinner w-5 h-5 border-2 rounded-full"></div>
-                    <span class="ml-2">Generating...</span>
-                  } @else {
-                    <span>Generate Motion</span>
-                  }
-                </button>
-              </div>
-            </div>
-            <div>
-              <h3 class="font-semibold text-slate-700 mb-2">Generated Motions</h3>
-              <div class="space-y-2">
-                @if(currentCase.motions.length > 0) {
-                  @for(motion of currentCase.motions; track motion.id) {
-                    <div (click)="viewMotion(motion)" class="p-3 rounded-md cursor-pointer transition" [class.bg-sky-100]="selectedMotion()?.id === motion.id" [class.hover:bg-slate-100]="selectedMotion()?.id !== motion.id">
-                      <p class="font-medium text-sm text-slate-800">{{ motion.type }}</p>
-                      <p class="text-xs text-slate-500">{{ motion.createdAt | date:'short' }}</p>
+      <!-- Tabs -->
+      <div class="border-b border-slate-200 mb-4">
+        <nav class="-mb-px flex space-x-6" aria-label="Tabs">
+          <button (click)="workspaceTab.set('motions')"
+            [class.border-sky-500]="workspaceTab() === 'motions'" [class.text-sky-600]="workspaceTab() === 'motions'"
+            [class.border-transparent]="workspaceTab() !== 'motions'" [class.text-slate-500]="workspaceTab() !== 'motions'"
+            class="hover:text-sky-600 hover:border-sky-500 whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition-colors">
+            Motion Generation
+          </button>
+          <button (click)="workspaceTab.set('discovery')"
+            [class.border-sky-500]="workspaceTab() === 'discovery'" [class.text-sky-600]="workspaceTab() === 'discovery'"
+            [class.border-transparent]="workspaceTab() !== 'discovery'" [class.text-slate-500]="workspaceTab() !== 'discovery'"
+            class="hover:text-sky-600 hover:border-sky-500 whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition-colors">
+            Discovery Analysis
+          </button>
+        </nav>
+      </div>
+
+      <!-- Tab Content -->
+      <div class="flex-grow overflow-hidden">
+        @if (workspaceTab() === 'motions') {
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 h-full">
+            <!-- Left Panel: History and Generation -->
+            <div class="lg:col-span-1 flex flex-col space-y-4 overflow-y-auto pr-2">
+              <div>
+                  <h3 class="font-semibold text-slate-700 mb-2">Generate New Motion</h3>
+                  <div class="space-y-3 p-4 bg-white rounded-lg shadow">
+                    <div>
+                      <label for="motion-type" class="block text-sm font-medium text-slate-700">Motion Type</label>
+                      <select id="motion-type" [(ngModel)]="motionType" name="motion-type" class="mt-1 block w-full input">
+                        <option>Motion to Suppress Evidence</option>
+                        <option>Motion to Dismiss</option>
+                        <option>Motion to Compel Discovery</option>
+                        <option>Motion for a Bill of Particulars</option>
+                        <option>Motion for a Change of Venue</option>
+                      </select>
                     </div>
+                    <div>
+                      <label for="factual-basis" class="block text-sm font-medium text-slate-700">Factual Basis for Motion</label>
+                      <textarea id="factual-basis" [(ngModel)]="factualBasis" name="factual-basis" rows="6" required class="mt-1 block w-full input" placeholder="Describe the specific facts..."></textarea>
+                    </div>
+                    <button (click)="generateMotion()" [disabled]="loading() || !factualBasis().trim()" class="w-full btn-primary flex items-center justify-center">
+                      @if(loading()) {
+                        <div class="spinner w-5 h-5 border-2 rounded-full"></div>
+                        <span class="ml-2">Generating...</span>
+                      } @else {
+                        <span>Generate Motion</span>
+                      }
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <h3 class="font-semibold text-slate-700 mb-2">Generated Motions</h3>
+                  <div class="space-y-2">
+                    @if(currentCase.motions.length > 0) {
+                      @for(motion of currentCase.motions; track motion.id) {
+                        <div (click)="viewMotion(motion)" class="p-3 rounded-md cursor-pointer transition" [class.bg-sky-100]="selectedMotion()?.id === motion.id" [class.hover:bg-slate-100]="selectedMotion()?.id !== motion.id">
+                          <p class="font-medium text-sm text-slate-800">{{ motion.type }}</p>
+                          <p class="text-xs text-slate-500">{{ motion.createdAt | date:'short' }}</p>
+                        </div>
+                      }
+                    } @else {
+                      <p class="text-sm text-slate-500 p-3">No motions generated yet.</p>
+                    }
+                  </div>
+                </div>
+            </div>
+
+            <!-- Right Panel: Generated Document Viewer -->
+            <div class="lg:col-span-2 bg-white p-4 rounded-lg shadow flex flex-col h-full overflow-hidden">
+              <div class="flex justify-between items-center mb-2 flex-shrink-0">
+                  <h3 class="text-lg font-semibold text-slate-800">Document Viewer</h3>
+                  @if(selectedMotion()) {
+                      <button (click)="copyMotionText()" class="btn-secondary text-sm flex items-center space-x-1.5">
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a2.25 2.25 0 0 1-2.25 2.25h-1.5a2.25 2.25 0 0 1-2.25-2.25v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 0 1 1.927-.184" /></svg>
+                          <span>Copy Text</span>
+                      </button>
                   }
+              </div>
+              <div class="flex-grow overflow-y-auto prose prose-sm max-w-none prose-slate bg-slate-50 p-4 rounded-md border">
+                @if (selectedMotion(); as motion) {
+                  <p class="whitespace-pre-wrap">{{ motion.generatedText }}</p>
+                } @else if (loading()) {
+                  <p class="text-slate-500">The AI is drafting the document...</p>
+                } @else if (error()) {
+                  <p class="text-red-600">{{ error() }}</p>
                 } @else {
-                  <p class="text-sm text-slate-500 p-3">No motions generated yet.</p>
+                  <p class="text-slate-500">Select a motion on the left to view it, or generate a new one.</p>
                 }
               </div>
             </div>
-        </div>
+          </div>
+        }
+        @if (workspaceTab() === 'discovery') {
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 h-full">
+            <!-- Left Panel: Discovery Documents -->
+            <div class="lg:col-span-1 flex flex-col h-full overflow-hidden">
+              <input type="file" #discoveryFileInput (change)="onFileSelectedForDiscovery($event)" class="hidden" accept="image/*,video/*,audio/*,.pdf,.txt,.md">
+              <button (click)="discoveryFileInput.click()" class="w-full btn-secondary mb-4">Upload Discovery Document</button>
+              
+              <div class="bg-white rounded-lg shadow flex-grow overflow-y-auto">
+                @if (currentCase.discoveryDocuments.length > 0) {
+                  <div class="space-y-1 p-2">
+                    @for (doc of currentCase.discoveryDocuments; track doc.id) {
+                      <div (click)="selectDocument(doc)" class="p-2 rounded-md cursor-pointer" [class.bg-sky-100]="selectedDocument()?.id === doc.id" [class.hover:bg-slate-100]="selectedDocument()?.id !== doc.id">
+                        <p class="font-medium text-sm text-slate-800 truncate">{{ doc.name }}</p>
+                        <p class="text-xs text-slate-500">{{ doc.mimeType }}</p>
+                      </div>
+                    }
+                  </div>
+                } @else {
+                  <p class="text-sm text-slate-500 text-center p-4">No discovery documents uploaded.</p>
+                }
+              </div>
+            </div>
 
-        <!-- Right Panel: Generated Document Viewer -->
-        <div class="lg:col-span-2 bg-white p-4 rounded-lg shadow flex flex-col h-full overflow-hidden">
-          <div class="flex justify-between items-center mb-2 flex-shrink-0">
-              <h3 class="text-lg font-semibold text-slate-800">Document Viewer</h3>
-              @if(selectedMotion()) {
-                  <button (click)="copyMotionText()" class="btn-secondary text-sm flex items-center space-x-1.5">
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a2.25 2.25 0 0 1-2.25 2.25h-1.5a2.25 2.25 0 0 1-2.25-2.25v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 0 1 1.927-.184" /></svg>
-                      <span>Copy Text</span>
-                  </button>
+            <!-- Right Panel: Analysis Workspace -->
+            <div class="lg:col-span-2 bg-white p-4 rounded-lg shadow flex flex-col h-full overflow-hidden">
+              @if (selectedDocument(); as doc) {
+                <div class="flex-shrink-0 border-b pb-2 mb-2">
+                    <h3 class="text-lg font-semibold text-slate-800 truncate">{{ doc.name }}</h3>
+                </div>
+                <!-- Viewer and Analysis History -->
+                <div class="flex-grow grid grid-cols-1 md:grid-cols-2 gap-4 overflow-hidden">
+                    <!-- Left: Preview & New Analysis -->
+                    <div class="flex flex-col space-y-4 overflow-y-auto pr-2">
+                        <div>
+                            <h4 class="font-semibold text-slate-700 mb-2">Document Preview</h4>
+                            <div class="border rounded-lg p-2 bg-slate-50 flex items-center justify-center min-h-[12rem]">
+                                @if (doc.mimeType.startsWith('image/')) {
+                                    <img [src]="'data:' + doc.mimeType + ';base64,' + doc.content" alt="File preview" class="max-h-48 max-w-full object-contain rounded">
+                                } @else if (doc.mimeType.startsWith('video/')) {
+                                    <video [src]="'data:' + doc.mimeType + ';base64,' + doc.content" controls class="max-h-48 max-w-full rounded"></video>
+                                } @else {
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-16 h-16 text-slate-400">
+                                      <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12 3 3m0 0 3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                                    </svg>
+                                }
+                            </div>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold text-slate-700 mb-2">New Analysis</h4>
+                            <textarea [(ngModel)]="discoveryPrompt" rows="4" class="w-full input" placeholder="e.g., Summarize this document. Find inconsistencies with case facts."></textarea>
+                            <button (click)="runDiscoveryAnalysis()" [disabled]="loading() || !discoveryPrompt().trim()" class="w-full btn-primary mt-2 flex items-center justify-center">
+                                @if (loading() && selectedAnalysis() === null) {
+                                  <div class="spinner w-5 h-5 border-2 rounded-full"></div><span class="ml-2">Analyzing...</span>
+                                } @else { <span>Run Analysis</span> }
+                            </button>
+                        </div>
+                        @if (error()) {
+                          <p class="text-red-600 text-sm p-2 bg-red-50 rounded-md">{{ error() }}</p>
+                        }
+                    </div>
+                    <!-- Right: Analysis History & Result Viewer -->
+                    <div class="flex flex-col overflow-y-auto">
+                        <h4 class="font-semibold text-slate-700 mb-2">Analysis History</h4>
+                        <div class="border rounded-lg flex-grow flex flex-col overflow-hidden">
+                           @if (doc.analyses.length > 0) {
+                              <div class="flex-shrink-0 border-b overflow-x-auto">
+                                @for (analysis of doc.analyses; track analysis.id) {
+                                    <button (click)="selectAnalysis(analysis)" class="p-2 text-sm whitespace-nowrap" [class.bg-slate-100]="selectedAnalysis()?.id === analysis.id">
+                                      Analysis @ {{ analysis.createdAt | date:'shortTime' }}
+                                    </button>
+                                }
+                              </div>
+                              <div class="prose prose-sm max-w-none prose-slate bg-slate-50 p-3 flex-grow overflow-y-auto">
+                                @if (selectedAnalysis(); as analysis) {
+                                  <p class="whitespace-pre-wrap">{{ analysis.result }}</p>
+                                } @else { <p>Select an analysis.</p> }
+                              </div>
+                           } @else {
+                             <div class="text-center p-4 text-slate-500 text-sm">No analysis history for this document.</div>
+                           }
+                        </div>
+                    </div>
+                </div>
+              } @else {
+                <div class="text-center py-12 flex flex-col items-center justify-center h-full">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-12 h-12 text-slate-400 mb-2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12 3 3m0 0 3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
+                  <p class="text-slate-500">Select a discovery document on the left, or upload a new one to begin analysis.</p>
+                </div>
               }
+            </div>
           </div>
-          <div class="flex-grow overflow-y-auto prose prose-sm max-w-none prose-slate bg-slate-50 p-4 rounded-md border">
-            @if (selectedMotion(); as motion) {
-              <p class="whitespace-pre-wrap">{{ motion.generatedText }}</p>
-            } @else if (loading()) {
-               <p class="text-slate-500">The AI is drafting the document...</p>
-            } @else if (error()) {
-              <p class="text-red-600">{{ error() }}</p>
-            } @else {
-              <p class="text-slate-500">Select a motion on the left to view it, or generate a new one.</p>
-            }
-          </div>
-        </div>
+        }
       </div>
     </div>
   }
