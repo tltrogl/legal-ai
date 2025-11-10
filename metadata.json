@@ -1,0 +1,7 @@
+{
+  "name": "Lexi AI: Legal Aid Assistant",
+  "description": "An AI-powered legal aid application to assist with case analysis, evidence review, and legal research. Analyze documents, images, audio, and video evidence, and get grounded legal insights.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

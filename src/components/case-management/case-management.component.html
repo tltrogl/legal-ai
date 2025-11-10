@@ -1,0 +1,161 @@
+<div class="h-full">
+  @if (view() === 'dashboard') {
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <!-- Left Panel: Create New Case -->
+      <div class="lg:col-span-1 bg-white rounded-lg shadow-lg p-6 h-fit">
+        <h2 class="text-2xl font-bold text-slate-800 mb-1">Case Creation Wizard</h2>
+        <p class="text-slate-600 mb-6">Start a new case file here.</p>
+        
+        <form (submit)="createCase()" class="space-y-4">
+          <div>
+            <label for="new-case-name" class="block text-sm font-medium text-slate-700">Case Name / Number</label>
+            <input id="new-case-name" [(ngModel)]="newCaseName" name="new-case-name" type="text" required class="mt-1 block w-full input" placeholder="e.g., U.S. v. John Doe">
+          </div>
+          <div>
+            <label for="new-jurisdiction" class="block text-sm font-medium text-slate-700">Jurisdiction</label>
+            <select id="new-jurisdiction" [(ngModel)]="newJurisdiction" name="new-jurisdiction" class="mt-1 block w-full input">
+              <option value="federal">Federal</option>
+              <option value="florida">Florida</option>
+            </select>
+          </div>
+          <div>
+            <label for="new-case-facts" class="block text-sm font-medium text-slate-700">Summary of Case Facts</label>
+            <textarea id="new-case-facts" [(ngModel)]="newCaseFacts" name="new-case-facts" rows="6" required class="mt-1 block w-full input" placeholder="Provide a detailed summary of the facts..."></textarea>
+          </div>
+          <button type="submit" [disabled]="!newCaseName().trim() || !newCaseFacts().trim()" class="w-full btn-primary">
+            Create & Open Case
+          </button>
+        </form>
+      </div>
+
+      <!-- Right Panel: Saved Cases -->
+      <div class="lg:col-span-2">
+        <h2 class="text-2xl font-bold text-slate-800 mb-6">Saved Cases</h2>
+        @if (caseFiles().length > 0) {
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            @for(caseFile of caseFiles(); track caseFile.id) {
+              <div (click)="loadCase(caseFile.id)" class="bg-white rounded-lg shadow p-4 border border-transparent hover:border-sky-500 hover:shadow-md cursor-pointer transition group">
+                <div class="flex justify-between items-start">
+                  <div>
+                    <h3 class="font-bold text-slate-800 group-hover:text-sky-600">{{ caseFile.name }}</h3>
+                    <span class="text-xs font-medium px-2 py-0.5 rounded-full mt-1 inline-block" [class.bg-blue-100]="caseFile.jurisdiction === 'federal'" [class.text-blue-800]="caseFile.jurisdiction === 'federal'" [class.bg-orange-100]="caseFile.jurisdiction === 'florida'" [class.text-orange-800]="caseFile.jurisdiction === 'florida'">
+                      {{ caseFile.jurisdiction === 'federal' ? 'Federal' : 'Florida' }}
+                    </span>
+                  </div>
+                  <button (click)="deleteCase(caseFile.id, $event)" class="text-slate-400 hover:text-red-600 opacity-50 group-hover:opacity-100 transition">
+                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></svg>
+                  </button>
+                </div>
+                <p class="text-xs text-slate-500 mt-2">Last updated: {{ caseFile.updatedAt | date:'short' }}</p>
+              </div>
+            }
+          </div>
+        } @else {
+          <div class="text-center py-12 border-2 border-dashed rounded-lg">
+            <p class="text-slate-500">No case files found. Create one to get started.</p>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  @if (view() === 'workspace' && activeCase(); as currentCase) {
+    <div class="flex flex-col h-full">
+      <div class="flex justify-between items-center mb-4 pb-4 border-b">
+        <div>
+          <h2 class="text-2xl font-bold text-slate-800">{{ currentCase.name }}</h2>
+          <span class="text-sm font-medium px-2 py-0.5 rounded-full" [class.bg-blue-100]="currentCase.jurisdiction === 'federal'" [class.text-blue-800]="currentCase.jurisdiction === 'federal'" [class.bg-orange-100]="currentCase.jurisdiction === 'florida'" [class.text-orange-800]="currentCase.jurisdiction === 'florida'">
+            {{ currentCase.jurisdiction === 'federal' ? 'Federal Jurisdiction' : 'Florida Jurisdiction' }}
+          </span>
+        </div>
+        <button (click)="backToDashboard()" class="btn-secondary">
+          &larr; Back to Dashboard
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 flex-grow overflow-hidden">
+        <!-- Left Panel: History and Generation -->
+        <div class="lg:col-span-1 flex flex-col space-y-4 overflow-y-auto pr-2">
+           <div>
+              <h3 class="font-semibold text-slate-700 mb-2">Generate New Motion</h3>
+              <div class="space-y-3 p-4 bg-white rounded-lg shadow">
+                <div>
+                  <label for="motion-type" class="block text-sm font-medium text-slate-700">Motion Type</label>
+                  <select id="motion-type" [(ngModel)]="motionType" name="motion-type" class="mt-1 block w-full input">
+                    <option>Motion to Suppress Evidence</option>
+                    <option>Motion to Dismiss</option>
+                    <option>Motion to Compel Discovery</option>
+                    <option>Motion for a Bill of Particulars</option>
+                    <option>Motion for a Change of Venue</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="factual-basis" class="block text-sm font-medium text-slate-700">Factual Basis for Motion</label>
+                  <textarea id="factual-basis" [(ngModel)]="factualBasis" name="factual-basis" rows="6" required class="mt-1 block w-full input" placeholder="Describe the specific facts..."></textarea>
+                </div>
+                <button (click)="generateMotion()" [disabled]="loading() || !factualBasis().trim()" class="w-full btn-primary flex items-center justify-center">
+                  @if(loading()) {
+                    <div class="spinner w-5 h-5 border-2 rounded-full"></div>
+                    <span class="ml-2">Generating...</span>
+                  } @else {
+                    <span>Generate Motion</span>
+                  }
+                </button>
+              </div>
+            </div>
+            <div>
+              <h3 class="font-semibold text-slate-700 mb-2">Generated Motions</h3>
+              <div class="space-y-2">
+                @if(currentCase.motions.length > 0) {
+                  @for(motion of currentCase.motions; track motion.id) {
+                    <div (click)="viewMotion(motion)" class="p-3 rounded-md cursor-pointer transition" [class.bg-sky-100]="selectedMotion()?.id === motion.id" [class.hover:bg-slate-100]="selectedMotion()?.id !== motion.id">
+                      <p class="font-medium text-sm text-slate-800">{{ motion.type }}</p>
+                      <p class="text-xs text-slate-500">{{ motion.createdAt | date:'short' }}</p>
+                    </div>
+                  }
+                } @else {
+                  <p class="text-sm text-slate-500 p-3">No motions generated yet.</p>
+                }
+              </div>
+            </div>
+        </div>
+
+        <!-- Right Panel: Generated Document Viewer -->
+        <div class="lg:col-span-2 bg-white p-4 rounded-lg shadow flex flex-col h-full overflow-hidden">
+          <div class="flex justify-between items-center mb-2 flex-shrink-0">
+              <h3 class="text-lg font-semibold text-slate-800">Document Viewer</h3>
+              @if(selectedMotion()) {
+                  <button (click)="copyMotionText()" class="btn-secondary text-sm flex items-center space-x-1.5">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a2.25 2.25 0 0 1-2.25 2.25h-1.5a2.25 2.25 0 0 1-2.25-2.25v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 0 1 1.927-.184" /></svg>
+                      <span>Copy Text</span>
+                  </button>
+              }
+          </div>
+          <div class="flex-grow overflow-y-auto prose prose-sm max-w-none prose-slate bg-slate-50 p-4 rounded-md border">
+            @if (selectedMotion(); as motion) {
+              <p class="whitespace-pre-wrap">{{ motion.generatedText }}</p>
+            } @else if (loading()) {
+               <p class="text-slate-500">The AI is drafting the document...</p>
+            } @else if (error()) {
+              <p class="text-red-600">{{ error() }}</p>
+            } @else {
+              <p class="text-slate-500">Select a motion on the left to view it, or generate a new one.</p>
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+</div>
+
+<style>
+  .input {
+    @apply block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm;
+  }
+  .btn-primary {
+    @apply bg-sky-600 text-white py-2 px-4 rounded-md hover:bg-sky-700 disabled:bg-slate-400 disabled:cursor-not-allowed transition-colors;
+  }
+  .btn-secondary {
+    @apply bg-slate-200 text-slate-700 py-2 px-4 rounded-md hover:bg-slate-300 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors;
+  }
+</style>

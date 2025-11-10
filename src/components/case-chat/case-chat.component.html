@@ -1,0 +1,67 @@
+<div class="flex flex-col h-full bg-white rounded-lg shadow-lg overflow-hidden">
+  <!-- Chat history -->
+  <div class="flex-grow p-6 overflow-y-auto">
+    <div class="flex flex-col space-y-4">
+      @for (message of history(); track $index) {
+        <div class="flex" [class.justify-end]="message.role === 'user'" [class.justify-start]="message.role === 'model'">
+          <div
+            class="p-4 rounded-2xl max-w-sm md:max-w-md lg:max-w-2xl"
+            [class.bg-sky-500]="message.role === 'user'"
+            [class.text-white]="message.role === 'user'"
+            [class.bg-slate-200]="message.role === 'model'"
+            [class.text-slate-800]="message.role === 'model'">
+            <p class="whitespace-pre-wrap">{{ message.parts[0].text }}</p>
+          </div>
+        </div>
+      }
+      @if (loading()) {
+        <div class="flex justify-start">
+            <div class="p-4 rounded-2xl max-w-sm md:max-w-md lg:max-w-2xl bg-slate-200 text-slate-800">
+                <div class="flex items-center space-x-2">
+                    <div class="w-2 h-2 bg-slate-500 rounded-full animate-pulse"></div>
+                    <div class="w-2 h-2 bg-slate-500 rounded-full animate-pulse" style="animation-delay: 0.2s;"></div>
+                    <div class="w-2 h-2 bg-slate-500 rounded-full animate-pulse" style="animation-delay: 0.4s;"></div>
+                </div>
+            </div>
+        </div>
+      }
+    </div>
+  </div>
+
+  <!-- Input area -->
+  <div class="p-4 bg-slate-100 border-t border-slate-200">
+    <div class="flex items-start space-x-4">
+      <div class="flex-grow">
+        <textarea
+          [(ngModel)]="prompt"
+          (keydown.enter)="sendMessage(); $event.preventDefault()"
+          [disabled]="loading()"
+          rows="1"
+          class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition resize-none"
+          [placeholder]="placeholderText()"></textarea>
+      </div>
+      <div class="flex flex-col items-center space-y-2">
+        <button
+          (click)="sendMessage()"
+          [disabled]="loading() || !prompt().trim()"
+          class="p-3 bg-sky-600 text-white rounded-lg hover:bg-sky-700 disabled:bg-slate-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />
+            </svg>
+        </button>
+      </div>
+    </div>
+    <div class="mt-2 flex items-center justify-end space-x-2">
+        <label for="deep-analysis-toggle" class="text-sm font-medium text-slate-600">Deep Analysis</label>
+        <button (click)="toggleDeepAnalysis()"
+            class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2"
+            [class.bg-sky-600]="useDeepAnalysis()" [class.bg-slate-300]="!useDeepAnalysis()"
+            role="switch" [attr.aria-checked]="useDeepAnalysis()">
+            <span class="sr-only">Use Deep Analysis</span>
+            <span aria-hidden="true"
+                class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                [class.translate-x-5]="useDeepAnalysis()" [class.translate-x-0]="!useDeepAnalysis()"></span>
+        </button>
+    </div>
+  </div>
+</div>
