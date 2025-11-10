@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { GoogleGenAI, GenerateContentResponse } from '@google/genai';
 import { ChatMessage } from '../models/chat.model';
+import { CaseFile, DiscoveryDocument } from '../models/case-file.model';
 
 @Injectable({
   providedIn: 'root',
@@ -54,17 +55,33 @@ export class GeminiService {
   }
 
   async analyzeDiscoveryEvidence(
-    caseContext: string,
-    prompt: string,
-    fileContent: string, // Can be base64 or plain text
-    mimeType: string
+    caseFile: CaseFile,
+    documentToAnalyze: DiscoveryDocument,
+    prompt: string
   ): Promise<GenerateContentResponse> {
+    const { caseFacts, motions, discoveryDocuments } = caseFile;
+    const { content: fileContent, mimeType, name: docName } = documentToAnalyze;
+
+    // Context of other documents, excluding the one being analyzed
+    const otherDocsContext = discoveryDocuments.filter(d => d.id !== documentToAnalyze.id).length > 0
+      ? `Other Available Discovery Documents:\n${discoveryDocuments.filter(d => d.id !== documentToAnalyze.id).map(d => `- ${d.name} (${d.mimeType})`).join('\n')}`
+      : 'There are no other discovery documents in the file.';
+
+    const motionsContext = motions.length > 0
+      ? `Filed Motions:\n${motions.map(m => `- ${m.type}`).join('\n')}`
+      : 'No motions have been filed yet.';
+
     const systemInstruction = `You are an expert paralegal analyzing a piece of discovery evidence in the context of a legal case.
     Case Summary:
     ---
-    ${caseContext}
+    ${caseFacts}
     ---
-    Your task is to analyze the provided evidence (text, image, or video) based on the user's specific prompt. Be thorough, objective, and highlight legally significant details.`;
+    Case History & Other Documents:
+    ---
+    ${motionsContext}
+    ${otherDocsContext}
+    ---
+    Your task is to analyze the provided evidence document ("${docName}") based on the user's specific prompt. Use the full case context provided to inform your analysis. Be thorough, objective, and highlight legally significant details, connections, or inconsistencies.`;
 
     if (mimeType.startsWith('image/') || mimeType.startsWith('video/')) {
       const model = mimeType.startsWith('video/') ? 'gemini-2.5-pro' : 'gemini-2.5-flash';
@@ -79,7 +96,7 @@ export class GeminiService {
       });
     } else { // Text or PDF content
       const model = 'gemini-2.5-pro';
-      const fullPrompt = `Evidence Document Content:\n\n---\n${fileContent}\n---\n\nUser's Analysis Request: "${prompt}"`;
+      const fullPrompt = `Evidence Document Content ("${docName}"):\n\n---\n${fileContent}\n---\n\nUser's Analysis Request: "${prompt}"`;
       
       return this.ai.models.generateContent({
         model,
@@ -119,14 +136,13 @@ export class GeminiService {
   }
 
   async generateLegalDocument(
-    jurisdiction: 'federal' | 'florida',
-    caseName: string,
-    caseFacts: string,
+    caseFile: CaseFile,
     motionType: string,
     factualBasis: string
   ): Promise<GenerateContentResponse> {
     const model = 'gemini-2.5-pro';
-    
+    const { jurisdiction, name: caseName, caseFacts, motions, discoveryDocuments } = caseFile;
+
     const jurisdictionRules = jurisdiction === 'federal'
         ? 'You must cite the Federal Rules of Criminal Procedure and relevant federal case law from United States District Courts, Circuit Courts of Appeals, and the Supreme Court of the United States.'
         : 'You must cite relevant Florida Statutes (F.S.) and case law from Florida District Courts of Appeal (DCA) and the Florida Supreme Court.';
@@ -138,22 +154,35 @@ export class GeminiService {
     - **Tone:** Formal and persuasive.
     - **Citations:** Ensure citations are formatted correctly for the jurisdiction.
     `;
+    
+    const existingMotionsContext = motions.length > 0 
+      ? `Existing Motions in Case File:\n${motions.map(m => `- ${m.type} (Filed: ${new Date(m.createdAt).toLocaleDateString()})`).join('\n')}`
+      : 'No existing motions have been filed.';
+      
+    const discoveryContext = discoveryDocuments.length > 0
+      ? `Available Discovery Documents in Case File:\n${discoveryDocuments.map(d => `- ${d.name} (${d.mimeType})`).join('\n')}`
+      : 'No discovery documents have been uploaded yet.';
 
     const contents = `
       **Case Name/Number:** ${caseName}
       **Jurisdiction:** ${jurisdiction}
+      
       **Summary of Case Facts:** 
       ${caseFacts}
+
+      **Case History & Existing Documents Context:**
+      ${existingMotionsContext}
+      ${discoveryContext}
       
       ---
       
-      **Motion to be Drafted:** ${motionType}
-      **Factual Basis for this Motion:** 
+      **NEW Motion to be Drafted:** ${motionType}
+      **Factual Basis for this NEW Motion:** 
       ${factualBasis}
       
       ---
       
-      Please draft the full text of the requested motion based on the information provided.
+      Please draft the full text of the requested new motion based on ALL the information provided, including the case facts and the context of existing documents and motions.
     `;
 
     return this.ai.models.generateContent({

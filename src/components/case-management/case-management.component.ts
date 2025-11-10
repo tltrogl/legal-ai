@@ -1,15 +1,13 @@
-import { ChangeDetectionStrategy, Component, inject, signal, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal, OnInit, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { GeminiService } from '../../services/gemini.service';
 import { CaseFileService } from '../../services/case-file.service';
+import { NavigationService } from '../../services/navigation.service';
 import { CaseFile, Motion, DiscoveryDocument, DiscoveryAnalysis } from '../../models/case-file.model';
 
 type ViewMode = 'dashboard' | 'workspace';
 type WorkspaceTab = 'motions' | 'discovery';
-
-// Declare pdfjsLib globally as it's loaded from a CDN script
-declare const pdfjsLib: any;
 
 @Component({
   selector: 'app-case-management',
@@ -20,6 +18,7 @@ declare const pdfjsLib: any;
 export class CaseManagementComponent implements OnInit {
   private geminiService = inject(GeminiService);
   private caseFileService = inject(CaseFileService);
+  private navigationService = inject(NavigationService);
 
   view = signal<ViewMode>('dashboard');
   workspaceTab = signal<WorkspaceTab>('motions');
@@ -49,6 +48,15 @@ export class CaseManagementComponent implements OnInit {
   loading = signal<boolean>(false);
   error = signal<string | null>(null);
   
+  constructor() {
+    effect(() => {
+      const caseIdToLoad = this.navigationService.caseToLoad();
+      if (caseIdToLoad && this.activeCase()?.id !== caseIdToLoad) {
+        this.loadCase(caseIdToLoad);
+      }
+    });
+  }
+
   ngOnInit() {
     this.loadCases();
   }
@@ -95,21 +103,65 @@ export class CaseManagementComponent implements OnInit {
   backToDashboard() {
     this.view.set('dashboard');
     this.activeCase.set(null);
+    this.navigationService.caseToLoad.set(null); // Clear the loading signal
     this.loadCases();
+  }
+
+  exportCaseFile() {
+    const caseFile = this.activeCase();
+    if (!caseFile) return;
+
+    const caseJson = JSON.stringify(caseFile, null, 2);
+    const blob = new Blob([caseJson], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${caseFile.name.replace(/ /g, '_')}_export.json`;
+    document.body.appendChild(a);
+    a.click();
+    
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  async onFileSelectedForImport(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    this.loading.set(true);
+    this.error.set(null);
+    try {
+      const fileContent = await file.text();
+      const caseFileToImport = JSON.parse(fileContent) as CaseFile;
+      // Basic validation
+      if (caseFileToImport.id && caseFileToImport.name && caseFileToImport.caseFacts) {
+        this.caseFileService.importCaseFile(caseFileToImport);
+        this.loadCases();
+      } else {
+        throw new Error('Invalid case file format.');
+      }
+    } catch (e) {
+      this.handleError(e, 'Failed to import case file');
+    } finally {
+      this.loading.set(false);
+      input.value = ''; // Reset file input
+    }
   }
 
   // Motion Methods
   async generateMotion() {
-    if (!this.factualBasis().trim() || !this.activeCase()) return;
+    const currentCase = this.activeCase();
+    if (!this.factualBasis().trim() || !currentCase) return;
+
     this.loading.set(true);
     this.error.set(null);
     this.selectedMotion.set(null);
 
-    const currentCase = this.activeCase()!;
     try {
       const response = await this.geminiService.generateLegalDocument(
-        currentCase.jurisdiction, currentCase.name, currentCase.caseFacts,
-        this.motionType(), this.factualBasis()
+        currentCase, this.motionType(), this.factualBasis()
       );
       const newMotion: Motion = {
         id: self.crypto.randomUUID(), type: this.motionType(), factualBasis: this.factualBasis(),
@@ -162,17 +214,16 @@ export class CaseManagementComponent implements OnInit {
   }
 
   async runDiscoveryAnalysis() {
-    if (!this.discoveryPrompt().trim() || !this.selectedDocument() || !this.activeCase()) return;
+    const currentCase = this.activeCase();
+    const currentDoc = this.selectedDocument();
+    if (!this.discoveryPrompt().trim() || !currentDoc || !currentCase) return;
     
     this.loading.set(true);
     this.error.set(null);
     
-    const currentCase = this.activeCase()!;
-    const currentDoc = this.selectedDocument()!;
-
     try {
       const response = await this.geminiService.analyzeDiscoveryEvidence(
-        currentCase.caseFacts, this.discoveryPrompt(), currentDoc.content, currentDoc.mimeType
+        currentCase, currentDoc, this.discoveryPrompt()
       );
       const newAnalysis: DiscoveryAnalysis = {
         id: self.crypto.randomUUID(), prompt: this.discoveryPrompt(),
@@ -228,7 +279,10 @@ export class CaseManagementComponent implements OnInit {
 
   private async readPdfAsText(file: File): Promise<string> {
     try {
+      // Dynamically import pdfjsLib
+      const pdfjsLib = await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.min.mjs');
       pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs`;
+
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
       let textContent = '';

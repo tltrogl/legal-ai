@@ -51,6 +51,17 @@ export class CaseFileService {
     this.saveAllFiles(files);
   }
 
+  importCaseFile(caseFileToImport: CaseFile): void {
+    let files = this.getCaseFiles();
+    const existingCaseIndex = files.findIndex(f => f.id === caseFileToImport.id);
+    if (existingCaseIndex > -1) {
+      files[existingCaseIndex] = caseFileToImport; // Overwrite existing case
+    } else {
+      files.push(caseFileToImport); // Add as a new case
+    }
+    this.saveAllFiles(files);
+  }
+
   private saveAllFiles(files: CaseFile[]): void {
     try {
       // Sort by most recently updated
