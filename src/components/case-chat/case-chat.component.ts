@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { GeminiService } from '../../services/gemini.service';
-import { ChatMessage } from '../../models/chat.model';
+import { ChatMessage, ChatPart } from '../../models/chat.model';
 
 @Component({
   selector: 'app-case-chat',
@@ -17,12 +17,15 @@ export class CaseChatComponent {
   history = signal<ChatMessage[]>([
     {
       role: 'model',
-      parts: [{ text: 'Hello! I am Lexi, your AI legal assistant. How can I help you analyze your case today?' }],
+      parts: [{ text: 'Hello! I am Lexi, your AI legal assistant. How can I help you analyze your case today? You can now attach images for analysis.' }],
     },
   ]);
   loading = signal<boolean>(false);
   error = signal<string | null>(null);
   useDeepAnalysis = signal<boolean>(true);
+
+  attachedFile = signal<File | null>(null);
+  filePreview = signal<string | null>(null);
 
   placeholderText = computed(() =>
     this.useDeepAnalysis()
@@ -30,37 +33,98 @@ export class CaseChatComponent {
       : 'Ask a quick question...'
   );
 
+  async onFileSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      this.attachedFile.set(file);
+      const reader = new FileReader();
+      reader.onload = (e) => this.filePreview.set(e.target?.result as string);
+      reader.readAsDataURL(file);
+      this.error.set(null);
+    } else {
+      this.removeFile();
+      this.error.set('Please select a valid image file.');
+    }
+    input.value = '';
+  }
+
+  removeFile() {
+    this.attachedFile.set(null);
+    this.filePreview.set(null);
+  }
+
   async sendMessage() {
     const currentPrompt = this.prompt().trim();
-    if (!currentPrompt || this.loading()) {
+    const currentFile = this.attachedFile();
+    if ((!currentPrompt && !currentFile) || this.loading()) {
       return;
     }
 
     this.loading.set(true);
     this.error.set(null);
 
-    const userMessage: ChatMessage = { role: 'user', parts: [{ text: currentPrompt }] };
-    this.history.update(h => [...h, userMessage]);
+    const userParts: ChatPart[] = [];
+    if (currentPrompt) {
+      userParts.push({ text: currentPrompt });
+    }
+    if (currentFile) {
+      try {
+        const base64Data = await this.fileToBase64(currentFile);
+        userParts.push({
+          inlineData: {
+            mimeType: currentFile.type,
+            data: base64Data,
+          },
+        });
+      } catch (e) {
+        this.handleError(e, 'Failed to read file');
+        this.loading.set(false);
+        return;
+      }
+    }
+
+    const userMessage: ChatMessage = { role: 'user', parts: userParts };
+    this.history.update((h) => [...h, userMessage]);
+
+    // Reset inputs
     this.prompt.set('');
+    this.removeFile();
 
     try {
-      const pastMessages = this.history().slice(0, -1); // Don't include the latest user message
-      const response = await this.geminiService.generateChatResponse(pastMessages, currentPrompt, this.useDeepAnalysis());
+      const pastMessages = this.history().slice(0, -1);
+      const response = await this.geminiService.generateChatResponse(pastMessages, userParts, this.useDeepAnalysis());
       const modelMessage: ChatMessage = { role: 'model', parts: [{ text: response.text }] };
-      this.history.update(h => [...h, modelMessage]);
+      this.history.update((h) => [...h, modelMessage]);
     } catch (e) {
-      console.error(e);
+      this.handleError(e, 'Failed to get response');
       const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
-      this.error.set(`Failed to get response: ${errorMessage}`);
-      // Add error message to history to inform user
-       const modelMessage: ChatMessage = { role: 'model', parts: [{ text: `Sorry, I encountered an error. Please try again. \n\n<${errorMessage}>` }] };
-       this.history.update(h => [...h, modelMessage]);
+      const modelMessage: ChatMessage = {
+        role: 'model',
+        parts: [{ text: `Sorry, I encountered an error. Please try again. \n\n<${errorMessage}>` }],
+      };
+      this.history.update((h) => [...h, modelMessage]);
     } finally {
       this.loading.set(false);
     }
   }
 
+  private fileToBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve((reader.result as string).split(',')[1]);
+      reader.onerror = (error) => reject(error);
+    });
+  }
+
+  private handleError(e: unknown, prefix: string) {
+    console.error(e);
+    const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
+    this.error.set(`${prefix}: ${errorMessage}`);
+  }
+
   toggleDeepAnalysis() {
-    this.useDeepAnalysis.update(v => !v);
+    this.useDeepAnalysis.update((v) => !v);
   }
 }

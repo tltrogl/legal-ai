@@ -10,7 +10,16 @@
             [class.text-white]="message.role === 'user'"
             [class.bg-slate-200]="message.role === 'model'"
             [class.text-slate-800]="message.role === 'model'">
-            <p class="whitespace-pre-wrap">{{ message.parts[0].text }}</p>
+            <div class="prose prose-sm max-w-none prose-slate">
+               @for(part of message.parts; track $index) {
+                @if (part.text) {
+                    <p class="whitespace-pre-wrap mb-2 last:mb-0">{{ part.text }}</p>
+                }
+                @if (part.inlineData) {
+                    <img [src]="'data:' + part.inlineData.mimeType + ';base64,' + part.inlineData.data" class="rounded-lg max-w-xs my-2">
+                }
+              }
+            </div>
           </div>
         </div>
       }
@@ -30,7 +39,29 @@
 
   <!-- Input area -->
   <div class="p-4 bg-slate-100 border-t border-slate-200">
+     @if (error()) {
+        <div class="p-3 mb-2 bg-red-100 text-red-800 rounded-lg text-sm">
+            {{ error() }}
+        </div>
+    }
+    @if(filePreview(); as preview) {
+      <div class="mb-2 relative w-24 h-24">
+        <img [src]="preview" class="w-full h-full object-cover rounded-lg shadow-md">
+        <button (click)="removeFile()" class="absolute -top-2 -right-2 bg-slate-600 text-white rounded-full p-0.5 hover:bg-red-600 shadow-lg">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" /></svg>
+        </button>
+      </div>
+    }
+
     <div class="flex items-start space-x-4">
+      <input type="file" #chatFileInput (change)="onFileSelected($event)" class="hidden" accept="image/*">
+       <button (click)="chatFileInput.click()" [disabled]="loading()"
+              class="p-3 bg-slate-200 text-slate-600 rounded-lg hover:bg-slate-300 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center flex-shrink-0">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+          <path stroke-linecap="round" stroke-linejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3.375 3.375 0 1 1 18.374 7.21l-4.243 4.243a1.125 1.125 0 0 1-1.59-1.59l4.243-4.243a3.375 3.375 0 0 1 4.773 4.773l-10.94 10.94a4.5 4.5 0 1 1-6.364-6.364l7.693-7.693a.75.75 0 0 1 1.06 1.06Z" />
+        </svg>
+      </button>
+
       <div class="flex-grow">
         <textarea
           [(ngModel)]="prompt"
@@ -43,7 +74,7 @@
       <div class="flex flex-col items-center space-y-2">
         <button
           (click)="sendMessage()"
-          [disabled]="loading() || !prompt().trim()"
+          [disabled]="loading() || (!prompt().trim() && !attachedFile())"
           class="p-3 bg-sky-600 text-white rounded-lg hover:bg-sky-700 disabled:bg-slate-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />

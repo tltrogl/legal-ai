@@ -72,7 +72,7 @@
       </div>
     }
     <div class="flex items-start space-x-3">
-      <input type="file" #fileInput (change)="onFileSelected($event)" class="hidden" accept=".txt,.md,text/plain,text/markdown">
+      <input type="file" #fileInput (change)="onFileSelected($event)" class="hidden" accept=".txt,.md,.pdf,text/plain,text/markdown,application/pdf">
       <button (click)="fileInput.click()" [disabled]="loading()"
               class="p-3 bg-slate-200 text-slate-600 rounded-lg hover:bg-slate-300 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center flex-shrink-0">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">

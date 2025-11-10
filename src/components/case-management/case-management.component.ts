@@ -21,15 +21,22 @@ export class CaseManagementComponent implements OnInit {
   private navigationService = inject(NavigationService);
 
   view = signal<ViewMode>('dashboard');
-  workspaceTab = signal<WorkspaceTab>('motions');
+  workspaceTab = signal<WorkspaceTab>('discovery');
   
   // Dashboard State
   caseFiles = signal<CaseFile[]>([]);
   
   // New Case "Wizard" State
+  wizardStep = signal<1 | 2>(1);
+  wizardLoading = signal<boolean>(false);
+  intakePrompts = signal<string>('');
   newCaseName = signal<string>('');
   newJurisdiction = signal<'federal' | 'florida'>('federal');
   newCaseFacts = signal<string>('');
+  showDiscoveryCallout = signal<boolean>(false);
+  extractionFile = signal<File | null>(null);
+  isExtracting = signal<boolean>(false);
+
 
   // Workspace State
   activeCase = signal<CaseFile | null>(null);
@@ -65,7 +72,57 @@ export class CaseManagementComponent implements OnInit {
     this.caseFiles.set(this.caseFileService.getCaseFiles());
   }
 
-  createCase() {
+  async goToWizardStep2() {
+    if (!this.newCaseName().trim()) return;
+    this.wizardLoading.set(true);
+    this.error.set(null);
+    try {
+      const response = await this.geminiService.generateCaseIntakePrompts(this.newJurisdiction());
+      this.intakePrompts.set(response.text);
+      this.wizardStep.set(2);
+    } catch (e) {
+      this.handleError(e, 'Failed to generate guidance');
+    } finally {
+      this.wizardLoading.set(false);
+    }
+  }
+
+  async extractFacts() {
+    const file = this.extractionFile();
+    if (!file) return;
+
+    this.isExtracting.set(true);
+    this.error.set(null);
+    try {
+      let content: string;
+      const mimeType = file.type;
+
+      if (mimeType.startsWith('image/') || mimeType.startsWith('video/')) {
+        content = await this.fileToBase64(file);
+      } else if (mimeType === 'application/pdf') {
+        content = await this.readPdfAsText(file);
+      } else {
+        content = await file.text();
+      }
+
+      const response = await this.geminiService.extractCaseFactsFromFile({ content, mimeType });
+      this.newCaseFacts.set(response.text);
+    } catch (e) {
+      this.handleError(e, 'Failed to extract facts');
+    } finally {
+      this.isExtracting.set(false);
+    }
+  }
+  
+  onFileSelectedForExtraction(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (file) {
+      this.extractionFile.set(file);
+    }
+  }
+
+  finishCaseCreation() {
     if (this.newCaseName().trim() && this.newCaseFacts().trim()) {
       const newCase = this.caseFileService.saveNewCase({
         name: this.newCaseName(),
@@ -74,10 +131,15 @@ export class CaseManagementComponent implements OnInit {
       });
       this.loadCases();
       this.loadCase(newCase.id);
+      this.showDiscoveryCallout.set(true);
       
+      // Reset wizard
+      this.wizardStep.set(1);
       this.newCaseName.set('');
       this.newCaseFacts.set('');
       this.newJurisdiction.set('federal');
+      this.intakePrompts.set('');
+      this.extractionFile.set(null);
     }
   }
   
@@ -88,7 +150,7 @@ export class CaseManagementComponent implements OnInit {
       this.resetMotionForm();
       this.resetDiscoveryState();
       this.view.set('workspace');
-      this.workspaceTab.set('motions');
+      this.workspaceTab.set('discovery'); // Default to discovery tab
     }
   }
 
@@ -105,6 +167,7 @@ export class CaseManagementComponent implements OnInit {
     this.activeCase.set(null);
     this.navigationService.caseToLoad.set(null); // Clear the loading signal
     this.loadCases();
+    this.wizardStep.set(1); // Reset wizard if user backs out
   }
 
   exportCaseFile() {
@@ -180,6 +243,7 @@ export class CaseManagementComponent implements OnInit {
 
   // Discovery Methods
   async onFileSelectedForDiscovery(event: Event) {
+    this.showDiscoveryCallout.set(false); // Hide callout on action
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file || !this.activeCase()) return;
@@ -246,6 +310,8 @@ export class CaseManagementComponent implements OnInit {
   }
 
   selectAnalysis(analysis: DiscoveryAnalysis) { this.selectedAnalysis.set(analysis); }
+
+  dismissCallout() { this.showDiscoveryCallout.set(false); }
 
   // Private Helper Methods
   private resetMotionForm() {

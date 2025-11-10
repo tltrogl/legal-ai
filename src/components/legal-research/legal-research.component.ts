@@ -26,7 +26,7 @@ export class LegalResearchComponent {
   history = signal<ResearchMessage[]>([
     {
       role: 'model',
-      text: 'Hello! I am your legal research assistant. You can ask me legal questions, and I will search for relevant information. You can also upload a document for context-aware research and analysis.',
+      text: 'Hello! I am your legal research assistant. You can ask me legal questions, and I will search for relevant information. You can also upload a document (TXT, MD, PDF) for context-aware research and analysis.',
     }
   ]);
 
@@ -37,11 +37,11 @@ export class LegalResearchComponent {
     const input = event.target as HTMLInputElement;
     if (input.files && input.files[0]) {
       const selectedFile = input.files[0];
-      if (selectedFile.type.startsWith('text/') || selectedFile.name.endsWith('.md')) {
+      if (selectedFile.type.startsWith('text/') || selectedFile.name.endsWith('.md') || selectedFile.type === 'application/pdf') {
         this.file.set(selectedFile);
         this.error.set(null);
       } else {
-        this.error.set('Please upload a valid text file (.txt, .md). Other formats are not yet supported.');
+        this.error.set('Please upload a valid text or PDF file (.txt, .md, .pdf).');
         this.file.set(null);
       }
       input.value = ''; 
@@ -94,7 +94,11 @@ export class LegalResearchComponent {
 
     try {
       if (currentFile) {
-        fileContent = await this.readFileAsText(currentFile);
+        if (currentFile.type === 'application/pdf') {
+          fileContent = await this.readPdfAsText(currentFile);
+        } else {
+          fileContent = await this.readFileAsText(currentFile);
+        }
       }
 
       const response = await this.geminiService.performLegalResearch(prompt, fileContent);
@@ -123,5 +127,27 @@ export class LegalResearchComponent {
       reader.onerror = (error) => reject(error);
       reader.readAsText(file);
     });
+  }
+
+  private async readPdfAsText(file: File): Promise<string> {
+    try {
+      // Dynamically import pdfjsLib
+      const pdfjsLib = await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.min.mjs');
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs`;
+
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+      let textContent = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const text = await page.getTextContent();
+        textContent += text.items.map((s: any) => s.str).join(' ');
+        textContent += '\n\n'; // Page break
+      }
+      return textContent;
+    } catch (error) {
+        console.error('Error reading PDF:', error);
+        throw new Error('Could not parse the PDF file.');
+    }
   }
 }
