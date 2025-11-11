@@ -18,7 +18,10 @@ An AI-powered legal aid application to assist with case analysis, evidence revie
 ## Technology Stack
 
 - **Frontend:** Angular 20 (standalone components, signals, zoneless change detection)
-- **AI/ML:** Google Gemini AI (2.5 Pro and Flash models)
+- **AI/ML:** Multiple FREE options available:
+  - **Ollama** - Run AI models locally (100% free, private)
+  - **Groq API** - Fast free API tier with open-source models
+  - Google Gemini AI (optional, paid)
 - **Styling:** TailwindCSS
 - **Language:** TypeScript 5.8
 - **Build Tool:** Angular CLI + Vite
@@ -28,7 +31,11 @@ An AI-powered legal aid application to assist with case analysis, evidence revie
 
 - Node.js (v18 or higher)
 - npm (v9 or higher)
-- Google Gemini API key
+- **AI Provider** (choose ONE free option):
+  - 🌟 **Ollama** (100% free, runs locally) - RECOMMENDED
+  - ⚡ **Groq API** (free tier, cloud-based)
+  - 🔄 **ChatGPT Extension** (coming soon)
+  - 💎 **Google Gemini API** (paid, optional)
 
 ## Installation
 
@@ -43,10 +50,29 @@ An AI-powered legal aid application to assist with case analysis, evidence revie
    npm install
    ```
 
-3. Create a `.env.local` file in the root directory and add your Gemini API key:
+3. **Set up a FREE AI provider** (choose one):
+
+   ### Option 1: Ollama (100% Free, Local) - RECOMMENDED
    ```bash
+   # Install Ollama from https://ollama.ai
+   # Then pull a model:
+   ollama pull llama3.1:8b
+   ```
+   
+   ### Option 2: Groq API (Free Tier)
+   ```bash
+   # Get free API key from https://console.groq.com
+   # Add to .env.local:
+   echo "GROQ_API_KEY=your-groq-api-key" > .env.local
+   ```
+   
+   ### Option 3: Gemini API (Paid)
+   ```bash
+   # Only if you want to use paid Gemini API:
    echo "API_KEY=your-gemini-api-key-here" > .env.local
    ```
+
+   **📖 Full setup guide:** See [FREE_AI_SETUP.md](FREE_AI_SETUP.md) for detailed instructions
 
 ## Usage
 
@@ -100,19 +126,92 @@ legal-ai/
 - [Project Analysis](PROJECT_ANALYSIS.md) - Comprehensive technical analysis
 - [Architecture Guide](ARCHITECTURE.md) - System architecture and design patterns
 - [Developer Guide](DEVELOPER_GUIDE.md) - Development setup and reference
+ - [FREE AI Setup](FREE_AI_SETUP.md) - Run entirely free with Ollama/Groq
+ - [Free AI Implementation Overview](FREE_AI_IMPLEMENTATION.md) - What was added and how it works
+ - [Resources](RESOURCES.md) - Curated repos and how we’ll use them
+
+## Open-source resources we will leverage (free-first)
+
+To move fast without paid APIs, we will reuse proven open-source projects. Here is what we’ll use and how it fits into this app:
+
+### Legal / Case Management
+- docassemble/docassemble (MIT)
+  - Use for: Motion templates and guided intake flows we can adapt into prompts/templates for motion generation.
+  - Repo: https://github.com/jhpyle/docassemble
+- Free Law Project: courtlistener (AGPL-3.0)
+  - Use for: Public court opinions and citations as grounding sources for research (optional ingestion into RAG store).
+  - Repo: https://github.com/freelawproject/courtlistener
+- Free Law Project: juriscraper (BSD-3-Clause)
+  - Use for: If we ingest public decisions/dockets into our local vector DB later.
+  - Repo: https://github.com/freelawproject/juriscraper
+- casebox/casebox (AGPL-3.0)
+  - Use for: Reference data model and UI patterns for case → discovery → motions.
+  - Repo: https://github.com/KETSE/casebox
+- opencasework/opencasework (GPL-3.0)
+  - Use for: Status pipelines, assignments, and role patterns we can mirror.
+  - Repo: https://github.com/opencivictech/opencasework
+- laws-africa/indigo (MIT)
+  - Use for: Legal document structure/citation modeling ideas for motion outputs.
+  - Repo: https://github.com/laws-africa/indigo
+
+### Vector DB / RAG (local, free)
+- Qdrant (Apache-2.0)
+  - Use for: Local vector DB via a single binary/Docker; store embeddings for case facts, discovery, and prior motions.
+  - Repo: https://github.com/qdrant/qdrant
+- LanceDB (Apache-2.0)
+  - Use for: Embedded vector DB in Node/TS (no server) for ultra-simple local RAG.
+  - Repo: https://github.com/lancedb/lancedb
+- Weaviate (BSD-3-Clause) / Milvus (Apache-2.0) / Chroma (Apache-2.0)
+  - Use for: Alternatives if we prefer GraphQL/scale/simplicity trade-offs.
+  - Repos: https://github.com/weaviate/weaviate • https://github.com/milvus-io/milvus • https://github.com/chroma-core/chroma
+- pgvector (Postgres extension)
+  - Use for: One-DB solution later if we add a backend with Postgres.
+  - Repo: https://github.com/pgvector/pgvector
+- Tooling: LangChainJS, LlamaIndexTS (MIT)
+  - Use for: Quickly wiring chunking, embeddings, retrieval steps in TypeScript.
+  - Repos: https://github.com/langchain-ai/langchainjs • https://github.com/run-llama/LlamaIndexTS
+
+### ChatGPT browser extension path (free with account)
+- Chrome extensions samples (MIT)
+  - Use for: MV3 scaffolding, content/background messaging patterns to automate ChatGPT web.
+  - Repo: https://github.com/GoogleChrome/chrome-extensions-samples
+
+Notes on licenses: Please review licenses before shipping derivative features. For AGPL/GPL projects, prefer using them for ideas/data access, not code-copying into this repo. MIT/Apache/BSD projects are generally safe to reuse with attribution.
 
 ## Supported Jurisdictions
 
 - Federal criminal defense cases
 - Florida state criminal defense cases
 
+## 💰 Zero-Cost AI Options
+
+**You don't need to pay for APIs!** This application now supports completely free AI providers:
+
+1. **Ollama (Local)** - Run AI models on your computer (100% free, private, offline)
+2. **Groq API** - Fast free cloud API with generous rate limits
+3. **ChatGPT Extension** - Use free ChatGPT web interface (coming soon)
+
+**See [FREE_AI_SETUP.md](FREE_AI_SETUP.md) for complete setup instructions.**
+
 ## Security Notes
 
-⚠️ **Warning:** This is a proof-of-concept application. Before deploying to production:
-- Move API key to a backend service (currently exposed in client code)
+⚠️ **Important Security Information:**
+
+**For Free Providers (Ollama):**
+- ✅ Data stays on your computer (100% private)
+- ✅ No API key needed
+- ✅ Recommended for confidential cases
+
+**For Cloud Providers (Groq):**
+- ⚠️ Data is sent to provider's servers
+- ⚠️ Store API keys in `.env.local` (not committed to git)
+- ⚠️ Don't use for highly sensitive cases without client consent
+
+**Before Production Deployment:**
 - Implement user authentication and authorization
 - Add data encryption for sensitive case information
 - Implement proper security headers and input sanitization
+- Use backend service for API key management (if using cloud providers)
 
 ## Contributing
 
@@ -129,7 +228,10 @@ Contributions are welcome! Please review the following before contributing:
 ## Acknowledgments
 
 - Built with [Angular](https://angular.dev)
-- Powered by [Google Gemini AI](https://ai.google.dev)
+- FREE AI Options:
+  - [Ollama](https://ollama.ai) - Local AI models
+  - [Groq](https://groq.com) - Fast free API
+- Optional: [Google Gemini AI](https://ai.google.dev)
 - Styled with [TailwindCSS](https://tailwindcss.com)
 
 ## Contact
