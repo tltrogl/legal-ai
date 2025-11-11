@@ -1,0 +1,16 @@
+version: '3.8'
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    ports:
+      - "6333:6333"
+    volumes:
+      # Bind-mount the qdrant storage into the project folder so data can live on the
+      # same drive as the repository (e.g., D:) instead of a Docker named volume on C:\.
+      - ./data/qdrant:/qdrant/storage
+    environment:
+      QDRANT__SERVICE__API_PORT: 6333
+
+## Note: we no longer use a named volume here because the service uses a bind mount
+## which stores data under ./data/qdrant relative to this compose file.

@@ -1,7 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { GeminiService } from '../../services/gemini.service';
+// Switch to AIProviderService to enable free providers
+import { AIProviderService } from '../../services/ai-provider.service';
 
 type AnalyzerMode = 'upload' | 'record';
 type RecordingState = 'idle' | 'recording' | 'stopped';
@@ -13,18 +14,18 @@ type RecordingState = 'idle' | 'recording' | 'stopped';
   imports: [CommonModule, FormsModule],
 })
 export class EvidenceAnalyzerComponent implements OnDestroy {
-  private geminiService = inject(GeminiService);
+  private aiService = inject(AIProviderService);
 
   mode = signal<AnalyzerMode>('upload');
   prompt = signal<string>('');
   file = signal<File | null>(null);
   filePreview = signal<string | null>(null);
   fileType = signal<'image' | 'video' | 'audio' | 'other' | null>(null);
-  
+
   loading = signal<boolean>(false);
   error = signal<string | null>(null);
   result = signal<string | null>(null);
-  
+
   // Audio recording state
   recordingState = signal<RecordingState>('idle');
   private mediaRecorder: MediaRecorder | null = null;
@@ -113,14 +114,15 @@ export class EvidenceAnalyzerComponent implements OnDestroy {
       this.error.set('Please select a file and enter a prompt.');
       return;
     }
-    
+
     this.loading.set(true);
     this.error.set(null);
     this.result.set(null);
-    
+
     try {
+      await this.ensureProviderInitialized();
       const base64Data = await this.fileToBase64(currentFile);
-      const response = await this.geminiService.analyzeMedia(currentPrompt, base64Data, currentFile.type);
+      const response = await this.aiService.analyzeMedia(currentPrompt, base64Data, currentFile.type);
       this.result.set(response.text);
     } catch (e) {
       console.error(e);
@@ -170,8 +172,8 @@ export class EvidenceAnalyzerComponent implements OnDestroy {
   }
 
   private stopRecordingStream() {
-    if(this.mediaRecorder && this.mediaRecorder.stream) {
-        this.mediaRecorder.stream.getTracks().forEach(track => track.stop());
+    if (this.mediaRecorder && this.mediaRecorder.stream) {
+      this.mediaRecorder.stream.getTracks().forEach(track => track.stop());
     }
   }
 
@@ -188,5 +190,14 @@ export class EvidenceAnalyzerComponent implements OnDestroy {
       this.recordingState.set('idle');
       this.audioChunks = [];
     }
+  }
+
+  private async ensureProviderInitialized() {
+    try {
+      // @ts-ignore best-effort init
+      if ((this.aiService as any).initialize) {
+        await (this.aiService as any).initialize();
+      }
+    } catch { }
   }
 }

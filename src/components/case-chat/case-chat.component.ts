@@ -1,7 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { GeminiService } from '../../services/gemini.service';
+// Switched from GeminiService to AIProviderService (free providers: Ollama/Groq/ChatGPT-ext)
+import { AIProviderService } from '../../services/ai-provider.service';
 import { ChatMessage, ChatPart } from '../../models/chat.model';
 
 @Component({
@@ -11,7 +12,7 @@ import { ChatMessage, ChatPart } from '../../models/chat.model';
   imports: [CommonModule, FormsModule],
 })
 export class CaseChatComponent {
-  private geminiService = inject(GeminiService);
+  private aiService = inject(AIProviderService);
 
   prompt = signal<string>('');
   history = signal<ChatMessage[]>([
@@ -92,8 +93,11 @@ export class CaseChatComponent {
     this.removeFile();
 
     try {
+      // Initialize provider lazily if not yet selected
+      // (Safe to call repeatedly; underlying impl can no-op if already ready.)
+      await this.ensureProviderInitialized();
       const pastMessages = this.history().slice(0, -1);
-      const response = await this.geminiService.generateChatResponse(pastMessages, userParts, this.useDeepAnalysis());
+      const response = await this.aiService.generateChatResponse(pastMessages as any, userParts as any, this.useDeepAnalysis());
       const modelMessage: ChatMessage = { role: 'model', parts: [{ text: response.text }] };
       this.history.update((h) => [...h, modelMessage]);
     } catch (e) {
@@ -106,6 +110,20 @@ export class CaseChatComponent {
       this.history.update((h) => [...h, modelMessage]);
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  private async ensureProviderInitialized() {
+    // If AIProviderService hasn’t selected a provider yet, attempt initialization.
+    // We rely on internal logic to pick first available (Ollama → Groq).
+    try {
+      // @ts-ignore accessing potential initialize if exposed
+      if ((this.aiService as any).initialize) {
+        await (this.aiService as any).initialize();
+      }
+    } catch (e) {
+      // Non-fatal; downstream call will surface error.
+      console.warn('AI provider initialization warning:', e);
     }
   }
 

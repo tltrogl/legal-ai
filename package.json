@@ -6,19 +6,22 @@
   "scripts": {
     "dev": "ng serve",
     "build": "ng build",
-    "preview": "ng serve --configuration=production"
+    "preview": "ng serve --configuration=production",
+    "seed-qdrant": "node ./src/scripts/seed-qdrant.js"
   },
   "dependencies": {
-    "rxjs": "^7.8.2",
-    "@google/genai": "^1.29.0",
-    "@angular/platform-browser": "^20.3.0",
-    "@angular/common": "^20.3.0",
-    "@angular/core": "^20.3.0",
-    "@angular/forms": "^20.3.10",
-    "@angular/compiler": "^20.3.0",
     "@angular/build": "^20.3.0",
     "@angular/cli": "^20.3.0",
+    "@angular/common": "^20.3.0",
+    "@angular/compiler": "^20.3.0",
     "@angular/compiler-cli": "^20.3.0",
+    "@angular/core": "^20.3.0",
+    "@angular/forms": "^20.3.10",
+    "@angular/platform-browser": "^20.3.0",
+    "@google/genai": "^1.29.0",
+    "@qdrant/js-client-rest": "^1.15.1",
+    "pdfjs-dist": "^4.4.168",
+    "rxjs": "^7.8.2",
     "tailwindcss": "latest"
   },
   "devDependencies": {

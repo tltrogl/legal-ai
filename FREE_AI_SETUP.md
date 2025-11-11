@@ -134,13 +134,27 @@ Groq provides fast, free API access to open-source models. No credit card needed
 
 ---
 
-## Option 3: ChatGPT Extension (Coming Soon)
+## Option 3: ChatGPT Extension (Experimental — free with account)
 
-**Status:** Under development
+**Status:** Experimental (prototype extension included in `extension/`)
 
-This option will use a browser extension to automate the free ChatGPT web interface.
+This option uses a small browser extension that automates the ChatGPT web UI so the app can use a logged-in ChatGPT session without a paid API. It is intended for personal experimentation only.
 
-**For now, use Ollama or Groq instead.**
+### Quick Install (Chrome/Edge)
+
+1. Open your browser and navigate to `chrome://extensions` (or `edge://extensions`).
+2. Enable **Developer mode**.
+3. Click **Load unpacked** and select the `extension/` folder from this repository.
+4. Open `https://chat.openai.com/` and sign in to your ChatGPT account.
+5. In the Lexi AI app Settings, choose **ChatGPT Extension** and click **Test**.
+
+### Important Warnings
+
+- This method uses your ChatGPT account session; anything sent to ChatGPT is subject to OpenAI's terms and may be used per their policies.
+- Do not use this method for highly sensitive or confidential client data unless you have explicit consent and have reviewed the legal/privacy implications.
+- The extension automates a consumer UI and may break if OpenAI updates the web app. Use it only for low-volume experimentation.
+
+See `extension/README.md` for more details and caveats.
 
 ---
 

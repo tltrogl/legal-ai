@@ -1,14 +1,17 @@
-
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { GeminiService } from '../../services/gemini.service';
-import { GroundingChunk } from '@google/genai';
+// Switch to AIProviderService (free providers)
+import { AIProviderService } from '../../services/ai-provider.service';
+
+// Optional source structure if provider returns citations
+type SourceChunk = { title?: string; url?: string; snippet?: string };
 
 interface ResearchMessage {
   role: 'user' | 'model';
   text: string;
-  sources?: GroundingChunk[];
+  // use local SourceChunk rather than an external GroundingChunk type
+  sources?: SourceChunk[];
 }
 
 @Component({
@@ -18,11 +21,11 @@ interface ResearchMessage {
   imports: [CommonModule, FormsModule],
 })
 export class LegalResearchComponent {
-  private geminiService = inject(GeminiService);
+  private aiService = inject(AIProviderService);
 
   prompt = signal<string>('');
   file = signal<File | null>(null);
-  
+
   history = signal<ResearchMessage[]>([
     {
       role: 'model',
@@ -32,7 +35,7 @@ export class LegalResearchComponent {
 
   loading = signal<boolean>(false);
   error = signal<string | null>(null);
-  
+
   onFileSelected(event: Event) {
     const input = event.target as HTMLInputElement;
     if (input.files && input.files[0]) {
@@ -44,10 +47,10 @@ export class LegalResearchComponent {
         this.error.set('Please upload a valid text or PDF file (.txt, .md, .pdf).');
         this.file.set(null);
       }
-      input.value = ''; 
+      input.value = '';
     }
   }
-  
+
   removeFile() {
     this.file.set(null);
   }
@@ -101,11 +104,12 @@ export class LegalResearchComponent {
         }
       }
 
-      const response = await this.geminiService.performLegalResearch(prompt, fileContent);
+      await this.ensureProviderInitialized();
+      const response = await this.aiService.performLegalResearch(prompt, fileContent);
       const modelMessage: ResearchMessage = {
         role: 'model',
         text: response.text,
-        sources: response.candidates?.[0]?.groundingMetadata?.groundingChunks ?? []
+        // sources may be provided in future by provider; default undefined
       };
       this.history.update(h => [...h, modelMessage]);
 
@@ -131,9 +135,13 @@ export class LegalResearchComponent {
 
   private async readPdfAsText(file: File): Promise<string> {
     try {
-      // Dynamically import pdfjsLib
-      const pdfjsLib = await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.min.mjs');
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs`;
+      // Dynamically import pdfjsLib from the installed package (resolves TS module typing)
+      const pdfjsLib = await import('pdfjs-dist/build/pdf');
+      // Worker path when served from the app; using the package's worker filename
+      // Adjust if you serve the worker from a different location in production
+      // @ts-ignore - the library defines GlobalWorkerOptions at runtime
+      // Use the asset path so the worker is served by the app (configured in angular.json)
+      pdfjsLib.GlobalWorkerOptions.workerSrc = '/assets/pdf.worker.min.js';
 
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
@@ -146,8 +154,17 @@ export class LegalResearchComponent {
       }
       return textContent;
     } catch (error) {
-        console.error('Error reading PDF:', error);
-        throw new Error('Could not parse the PDF file.');
+      console.error('Error reading PDF:', error);
+      throw new Error('Could not parse the PDF file.');
     }
+  }
+
+  private async ensureProviderInitialized() {
+    try {
+      // @ts-ignore optional init
+      if ((this.aiService as any).initialize) {
+        await (this.aiService as any).initialize();
+      }
+    } catch { }
   }
 }

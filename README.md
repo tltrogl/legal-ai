@@ -34,7 +34,7 @@ An AI-powered legal aid application to assist with case analysis, evidence revie
 - **AI Provider** (choose ONE free option):
   - 🌟 **Ollama** (100% free, runs locally) - RECOMMENDED
   - ⚡ **Groq API** (free tier, cloud-based)
-  - 🔄 **ChatGPT Extension** (coming soon)
+  - 🔄 **ChatGPT Extension** (experimental — uses browser automation)
   - 💎 **Google Gemini API** (paid, optional)
 
 ## Installation
@@ -66,11 +66,27 @@ An AI-powered legal aid application to assist with case analysis, evidence revie
    echo "GROQ_API_KEY=your-groq-api-key" > .env.local
    ```
    
-   ### Option 3: Gemini API (Paid)
-   ```bash
-   # Only if you want to use paid Gemini API:
-   echo "API_KEY=your-gemini-api-key-here" > .env.local
-   ```
+  ### Option 3: ChatGPT Extension (Experimental — free with account)
+  This repository includes a small browser extension prototype that automates the ChatGPT web UI so the app can use a logged-in ChatGPT session without a paid API. This is experimental and intended for personal, low-volume use only.
+
+  Steps to try the extension locally:
+  1. Build or open this repo in your file system.
+  2. Open Chrome/Edge and go to `chrome://extensions` (or `edge://extensions`).
+  3. Enable "Developer mode" and click "Load unpacked".
+  4. Select the `extension/` folder in this repository.
+  5. Open `https://chat.openai.com/`, sign in, and keep the tab active.
+  6. In the app Settings, choose "ChatGPT Extension" and click "Test".
+
+  Important notices:
+  - This method uses your ChatGPT account session; data you send may be visible to OpenAI per their terms.
+  - Review OpenAI's Terms of Service before automating the UI. This approach is intended only for experimentation.
+  - See `extension/README.md` for full details and caveats.
+
+  ### Option 4: Gemini API (Paid)
+  ```bash
+  # Only if you want to use paid Gemini API:
+  echo "API_KEY=your-gemini-api-key-here" > .env.local
+  ```
 
    **📖 Full setup guide:** See [FREE_AI_SETUP.md](FREE_AI_SETUP.md) for detailed instructions
 

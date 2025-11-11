@@ -13,6 +13,7 @@ import { Injectable, inject } from '@angular/core';
 import { AIProvider, ChatMessage, GenerateResponse, AIProviderConfig } from './ai-provider.interface';
 import { OllamaService } from './ollama.service';
 import { GroqService } from './groq.service';
+import { ChatGPTExtensionService } from './chatgpt-extension.service';
 import { CaseFile, DiscoveryDocument } from '../models/case-file.model';
 
 @Injectable({
@@ -21,6 +22,7 @@ import { CaseFile, DiscoveryDocument } from '../models/case-file.model';
 export class AIProviderService {
     private ollamaService = inject(OllamaService);
     private groqService = inject(GroqService);
+    private chatgptExtensionService = inject(ChatGPTExtensionService);
 
     private currentProvider: AIProvider | null = null;
     private currentProviderName: string = 'ollama'; // Default to local/free
@@ -28,8 +30,9 @@ export class AIProviderService {
     async initialize(): Promise<void> {
         // Try to initialize all providers
         await Promise.all([
-            this.ollamaService.initialize(),
-            this.groqService.initialize(),
+            this.ollamaService.initialize().catch(() => { }),
+            this.groqService.initialize().catch(() => { }),
+            this.chatgptExtensionService.initialize().catch(() => { }),
         ]);
 
         // Select first available provider
@@ -54,6 +57,10 @@ export class AIProviderService {
             this.currentProvider = this.groqService;
             this.currentProviderName = 'groq';
             console.log('✅ Using Groq (Free API)');
+        } else if (this.chatgptExtensionService.isAvailable) {
+            this.currentProvider = this.chatgptExtensionService;
+            this.currentProviderName = 'chatgpt-extension';
+            console.log('✅ Using ChatGPT Extension');
         } else {
             console.warn('⚠️ No AI providers available. Please configure one in Settings.');
             this.currentProvider = null;
@@ -79,6 +86,14 @@ export class AIProviderService {
                 }
                 if (this.groqService.isAvailable) {
                     provider = this.groqService;
+                }
+                break;
+            case 'chatgpt-extension':
+                if (!this.chatgptExtensionService.isAvailable) {
+                    await this.chatgptExtensionService.initialize();
+                }
+                if (this.chatgptExtensionService.isAvailable) {
+                    provider = this.chatgptExtensionService;
                 }
                 break;
 
@@ -114,7 +129,7 @@ export class AIProviderService {
             },
             {
                 name: 'chatgpt-extension',
-                available: false, // Not implemented yet
+                available: this.chatgptExtensionService.isAvailable,
                 cost: 'free',
             },
         ];

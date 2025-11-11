@@ -24,7 +24,8 @@
       ]
     }
   },
-  "files": [
+  "include": [
+    "src/**/*",
     "./index.tsx"
   ],
   "angularCompilerOptions": {

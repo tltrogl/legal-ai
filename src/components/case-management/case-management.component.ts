@@ -1,7 +1,8 @@
 import { ChangeDetectionStrategy, Component, inject, signal, OnInit, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { GeminiService } from '../../services/gemini.service';
+// Switch to AIProviderService to enable free providers
+import { AIProviderService } from '../../services/ai-provider.service';
 import { CaseFileService } from '../../services/case-file.service';
 import { NavigationService } from '../../services/navigation.service';
 import { CaseFile, Motion, DiscoveryDocument, DiscoveryAnalysis } from '../../models/case-file.model';
@@ -16,16 +17,16 @@ type WorkspaceTab = 'motions' | 'discovery';
   imports: [CommonModule, FormsModule],
 })
 export class CaseManagementComponent implements OnInit {
-  private geminiService = inject(GeminiService);
+  private aiService = inject(AIProviderService);
   private caseFileService = inject(CaseFileService);
   private navigationService = inject(NavigationService);
 
   view = signal<ViewMode>('dashboard');
   workspaceTab = signal<WorkspaceTab>('discovery');
-  
+
   // Dashboard State
   caseFiles = signal<CaseFile[]>([]);
-  
+
   // New Case "Wizard" State
   wizardStep = signal<1 | 2>(1);
   wizardLoading = signal<boolean>(false);
@@ -40,21 +41,21 @@ export class CaseManagementComponent implements OnInit {
 
   // Workspace State
   activeCase = signal<CaseFile | null>(null);
-  
+
   // Motion State
   selectedMotion = signal<Motion | null>(null);
   motionType = signal<string>('Motion to Suppress Evidence');
   factualBasis = signal<string>('');
-  
+
   // Discovery State
   selectedDocument = signal<DiscoveryDocument | null>(null);
   selectedAnalysis = signal<DiscoveryAnalysis | null>(null);
   discoveryPrompt = signal<string>('');
-  
+
   // UI State
   loading = signal<boolean>(false);
   error = signal<string | null>(null);
-  
+
   constructor() {
     effect(() => {
       const caseIdToLoad = this.navigationService.caseToLoad();
@@ -77,7 +78,8 @@ export class CaseManagementComponent implements OnInit {
     this.wizardLoading.set(true);
     this.error.set(null);
     try {
-      const response = await this.geminiService.generateCaseIntakePrompts(this.newJurisdiction());
+      await this.ensureProviderInitialized();
+      const response = await this.aiService.generateCaseIntakePrompts(this.newJurisdiction());
       this.intakePrompts.set(response.text);
       this.wizardStep.set(2);
     } catch (e) {
@@ -105,7 +107,8 @@ export class CaseManagementComponent implements OnInit {
         content = await file.text();
       }
 
-      const response = await this.geminiService.extractCaseFactsFromFile({ content, mimeType });
+      await this.ensureProviderInitialized();
+      const response = await this.aiService.extractCaseFactsFromFile({ content, mimeType });
       this.newCaseFacts.set(response.text);
     } catch (e) {
       this.handleError(e, 'Failed to extract facts');
@@ -113,7 +116,7 @@ export class CaseManagementComponent implements OnInit {
       this.isExtracting.set(false);
     }
   }
-  
+
   onFileSelectedForExtraction(event: Event) {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
@@ -132,7 +135,7 @@ export class CaseManagementComponent implements OnInit {
       this.loadCases();
       this.loadCase(newCase.id);
       this.showDiscoveryCallout.set(true);
-      
+
       // Reset wizard
       this.wizardStep.set(1);
       this.newCaseName.set('');
@@ -142,7 +145,7 @@ export class CaseManagementComponent implements OnInit {
       this.extractionFile.set(null);
     }
   }
-  
+
   loadCase(id: string) {
     const caseFile = this.caseFileService.getCaseFile(id);
     if (caseFile) {
@@ -177,13 +180,13 @@ export class CaseManagementComponent implements OnInit {
     const caseJson = JSON.stringify(caseFile, null, 2);
     const blob = new Blob([caseJson], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    
+
     const a = document.createElement('a');
     a.href = url;
     a.download = `${caseFile.name.replace(/ /g, '_')}_export.json`;
     document.body.appendChild(a);
     a.click();
-    
+
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }
@@ -223,7 +226,8 @@ export class CaseManagementComponent implements OnInit {
     this.selectedMotion.set(null);
 
     try {
-      const response = await this.geminiService.generateLegalDocument(
+      await this.ensureProviderInitialized();
+      const response = await this.aiService.generateLegalDocument(
         currentCase, this.motionType(), this.factualBasis()
       );
       const newMotion: Motion = {
@@ -234,10 +238,10 @@ export class CaseManagementComponent implements OnInit {
       this.activeCase.set(this.caseFileService.updateCaseFile(currentCase));
       this.selectedMotion.set(newMotion);
       this.resetMotionForm();
-    } catch (e) { this.handleError(e, 'Failed to generate motion'); } 
-      finally { this.loading.set(false); }
+    } catch (e) { this.handleError(e, 'Failed to generate motion'); }
+    finally { this.loading.set(false); }
   }
-  
+
   viewMotion(motion: Motion) { this.selectedMotion.set(motion); }
   copyMotionText() { if (this.selectedMotion()?.generatedText) navigator.clipboard.writeText(this.selectedMotion()!.generatedText); }
 
@@ -272,8 +276,8 @@ export class CaseManagementComponent implements OnInit {
       this.selectDocument(newDocument);
 
     } catch (e) { this.handleError(e, 'Failed to process file'); }
-      finally { this.loading.set(false); }
-    
+    finally { this.loading.set(false); }
+
     input.value = ''; // Reset file input
   }
 
@@ -281,12 +285,13 @@ export class CaseManagementComponent implements OnInit {
     const currentCase = this.activeCase();
     const currentDoc = this.selectedDocument();
     if (!this.discoveryPrompt().trim() || !currentDoc || !currentCase) return;
-    
+
     this.loading.set(true);
     this.error.set(null);
-    
+
     try {
-      const response = await this.geminiService.analyzeDiscoveryEvidence(
+      await this.ensureProviderInitialized();
+      const response = await this.aiService.analyzeDiscoveryEvidence(
         currentCase, currentDoc, this.discoveryPrompt()
       );
       const newAnalysis: DiscoveryAnalysis = {
@@ -300,7 +305,7 @@ export class CaseManagementComponent implements OnInit {
       this.discoveryPrompt.set('');
 
     } catch (e) { this.handleError(e, 'Failed to run analysis'); }
-      finally { this.loading.set(false); }
+    finally { this.loading.set(false); }
   }
 
   selectDocument(doc: DiscoveryDocument) {
@@ -327,7 +332,7 @@ export class CaseManagementComponent implements OnInit {
     this.discoveryPrompt.set('');
     this.error.set(null);
   }
-  
+
   private handleError(e: unknown, prefix: string) {
     console.error(e);
     const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
@@ -345,9 +350,11 @@ export class CaseManagementComponent implements OnInit {
 
   private async readPdfAsText(file: File): Promise<string> {
     try {
-      // Dynamically import pdfjsLib
-      const pdfjsLib = await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.min.mjs');
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs`;
+      // Dynamically import pdfjsLib from the installed package (resolves TS module typing)
+      const pdfjsLib = await import('pdfjs-dist/build/pdf');
+      // @ts-ignore - the library defines GlobalWorkerOptions at runtime
+      // Use the asset path so the worker is served by the app (configured in angular.json)
+      pdfjsLib.GlobalWorkerOptions.workerSrc = '/assets/pdf.worker.min.js';
 
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
@@ -360,8 +367,17 @@ export class CaseManagementComponent implements OnInit {
       }
       return textContent;
     } catch (error) {
-        console.error('Error reading PDF:', error);
-        throw new Error('Could not parse the PDF file.');
+      console.error('Error reading PDF:', error);
+      throw new Error('Could not parse the PDF file.');
     }
+  }
+
+  private async ensureProviderInitialized() {
+    try {
+      // @ts-ignore optional init
+      if ((this.aiService as any).initialize) {
+        await (this.aiService as any).initialize();
+      }
+    } catch { }
   }
 }

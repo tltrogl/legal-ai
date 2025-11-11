@@ -1,0 +1,27 @@
+{
+    "manifest_version": 3,
+    "name": "Lexi ChatGPT Bridge",
+    "version": "0.1.0",
+    "description": "Bridges the Lexi AI app with ChatGPT web UI for free chat (experimental).",
+    "permissions": [
+        "scripting",
+        "activeTab"
+    ],
+    "host_permissions": [
+        "https://chat.openai.com/*"
+    ],
+    "background": {
+        "service_worker": "background.js"
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "https://chat.openai.com/*"
+            ],
+            "js": [
+                "content-script.js"
+            ],
+            "run_at": "document_end"
+        }
+    ]
+}

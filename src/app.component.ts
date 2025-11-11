@@ -1,4 +1,3 @@
-
 import { ChangeDetectionStrategy, Component, effect, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
@@ -7,9 +6,11 @@ import { CaseChatComponent } from './components/case-chat/case-chat.component';
 import { EvidenceAnalyzerComponent } from './components/evidence-analyzer/evidence-analyzer.component';
 import { LegalResearchComponent } from './components/legal-research/legal-research.component';
 import { CaseManagementComponent } from './components/case-management/case-management.component';
+import { AISettingsComponent } from './components/ai-settings/ai-settings.component';
 import { NavigationService } from './services/navigation.service';
+import { environment } from './environments/environment';
 
-export type AppTab = 'home' | 'chat' | 'evidence' | 'research' | 'management';
+export type AppTab = 'home' | 'chat' | 'evidence' | 'research' | 'management' | 'settings';
 
 @Component({
   selector: 'app-root',
@@ -22,6 +23,7 @@ export type AppTab = 'home' | 'chat' | 'evidence' | 'research' | 'management';
     EvidenceAnalyzerComponent,
     LegalResearchComponent,
     CaseManagementComponent,
+    AISettingsComponent,
   ],
 })
 export class AppComponent {
@@ -29,6 +31,8 @@ export class AppComponent {
   activeTab = signal<AppTab>('home');
 
   constructor() {
+    console.log('Qdrant URL:', environment.qdrantUrl ? 'Loaded' : 'Not Loaded');
+
     effect(() => {
       const caseToLoad = this.navigationService.caseToLoad();
       if (caseToLoad) {

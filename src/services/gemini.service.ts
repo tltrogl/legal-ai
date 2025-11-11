@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { GoogleGenAI, GenerateContentResponse, GroundingChunk } from '@google/genai';
+import { GoogleGenAI, GenerateContentResponse } from '@google/genai';
 import { ChatMessage, ChatPart } from '../models/chat.model';
 import { CaseFile, DiscoveryDocument } from '../models/case-file.model';
 
@@ -20,23 +20,25 @@ export class GeminiService {
     const model = deepAnalysis ? 'gemini-2.5-pro' : 'gemini-2.5-flash';
     // Deep Analysis / Thinking Mode uses Pro with max thinking budget.
     // Standard mode uses Flash with no thinking for speed.
-    const config = deepAnalysis 
-      ? { thinkingConfig: { thinkingBudget: 32768 } } 
+    const config = deepAnalysis
+      ? { thinkingConfig: { thinkingBudget: 32768 } }
       : { thinkingConfig: { thinkingBudget: 0 } };
-    
+
     const chat = this.ai.chats.create({
-        model,
-        history,
-        config
+      model,
+      history,
+      config
     });
 
-    return chat.sendMessage(newContent);
+    // The underlying SDK expects a message container; wrap parts into the message shape
+    const payload: any = { message: { parts: newContent } };
+    return chat.sendMessage(payload);
   }
 
   async analyzeMedia(prompt: string, base64Data: string, mimeType: string): Promise<GenerateContentResponse> {
     const isVideo = mimeType.startsWith('video/');
     const model = isVideo ? 'gemini-2.5-pro' : 'gemini-2.5-flash';
-    
+
     const imagePart = {
       inlineData: {
         mimeType,
@@ -65,12 +67,12 @@ export class GeminiService {
         model: 'gemini-2.5-flash',
         contents: prompt,
         config: {
-          tools: [{googleSearch: {}}],
+          tools: [{ googleSearch: {} }],
         }
       });
     }
   }
-  
+
   async generateCaseIntakePrompts(jurisdiction: 'federal' | 'florida'): Promise<GenerateContentResponse> {
     const prompt = `Generate a short checklist of key questions and topics a defense attorney should cover when writing a case summary for a new criminal case in ${jurisdiction} jurisdiction. Focus on the most critical information needed for an initial case file.`;
     return this.ai.models.generateContent({
@@ -81,7 +83,7 @@ export class GeminiService {
 
   async extractCaseFactsFromFile(document: { content: string, mimeType: string }): Promise<GenerateContentResponse> {
     const systemInstruction = "You are an expert paralegal. Your task is to analyze the provided document and extract a concise, well-structured summary of the case facts. Focus on key events, dates, individuals, and alleged offenses. Present the facts in a clear, narrative format suitable for a case file summary.";
-    
+
     const textPart = { text: "Please extract the case facts from the attached document." };
     const filePart = { inlineData: { data: document.content, mimeType: document.mimeType } };
 
