@@ -5,30 +5,41 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+// Load dotenv if present in local dev. In production/CI set variables in the environment.
+try {
+    // eslint-disable-next-line node/no-extraneous-import
+    await import('dotenv/config');
+} catch (e) {
+    // ignore if dotenv is not installed globally; package.json includes it as devDependency.
+}
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// --- Start: Read credentials directly from environment file ---
-const envFilePath = path.resolve(__dirname, '..', 'environments', 'environment.local.ts');
-let QDRANT_URL;
-let QDRANT_API_KEY;
+// Prefer process.env for credentials. Fallback to local TS env file for backward compatibility.
+let QDRANT_URL = process.env.QDRANT_URL;
+let QDRANT_API_KEY = process.env.QDRANT_API_KEY;
 
-try {
-    const envFileContent = fs.readFileSync(envFilePath, 'utf-8');
-    const urlMatch = envFileContent.match(/qdrantUrl: '(.*?)'/);
-    const keyMatch = envFileContent.match(/qdrantApiKey: '(.*?)'/);
-
-    if (!urlMatch || !keyMatch) {
-        throw new Error('Could not parse credentials from environment.local.ts');
+if (!QDRANT_URL || !QDRANT_API_KEY) {
+    // try to read src/environments/environment.local.ts as a fallback (developer convenience only)
+    const envFilePath = path.resolve(__dirname, '..', 'environments', 'environment.local.ts');
+    try {
+        const envFileContent = fs.readFileSync(envFilePath, 'utf-8');
+        const urlMatch = envFileContent.match(/qdrantUrl:\s*['"](.*?)['"]/);
+        const keyMatch = envFileContent.match(/qdrantApiKey:\s*['"](.*?)['"]/);
+        if (urlMatch && keyMatch) {
+            QDRANT_URL = urlMatch[1];
+            QDRANT_API_KEY = keyMatch[1];
+        }
+    } catch (error) {
+        // no local TS env file — we'll error below with a helpful message
     }
+}
 
-    QDRANT_URL = urlMatch[1];
-    QDRANT_API_KEY = keyMatch[1];
-} catch (error) {
-    console.error(`Failed to read or parse environment file at ${envFilePath}`, error);
+if (!QDRANT_URL || !QDRANT_API_KEY) {
+    console.error('QDRANT_URL and QDRANT_API_KEY are required. Set them in .env.local or in the environment. See .env.example.');
     process.exit(1);
 }
-// --- End: Read credentials ---
 
 // Use direct HTTP calls to Qdrant REST API to avoid client-version mismatches.
 async function qdrantCreateCollection(name, vectorsConfig) {
@@ -105,7 +116,8 @@ async function run() {
         { id: 'doc3', text: 'Forensic lab results showing DNA match to subject in custody.' },
     ];
 
-    const points = docs.map(d => ({ id: d.id, vector: simpleTextToVector(d.text), payload: { text: d.text } }));
+    // Qdrant requires point IDs to be numeric or UUID strings. Use numeric IDs and keep original id in payload.
+    const points = docs.map((d, idx) => ({ id: idx + 1, vector: simpleTextToVector(d.text), payload: { sourceId: d.id, text: d.text } }));
     await qdrantUpsertPoints(collection, points);
     console.log('Seeded', points.length, 'points');
 
