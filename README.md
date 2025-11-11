@@ -15,6 +15,25 @@ An AI-powered legal aid application to assist with case analysis, evidence revie
 - **Motion Generation** - AI-powered legal document generation with jurisdiction-specific citations
 - **Discovery Management** - Upload and analyze discovery documents with full case context
 
+## Refactor goals & immediate objectives
+We're doing a focused refactor to make the agent tooling (seeding, retrieval, and manifests) robust, secure, and CI-friendly. These are the immediate goals we expect to complete in short iterations:
+
+- Environment & secrets hygiene
+  - Introduce `.env.example` and make Node scripts read `process.env` (use `dotenv` locally). Never import frontend `src/environments/*.ts` from Node.
+- Qdrant & retrieval stability
+  - Add a small REST wrapper (`src/lib/qdrant-http.ts`) and use it in `src/services/retrieval.service.ts` so scripts and services share the same request shape. Ensure `npm run seed-qdrant` succeeds against Qdrant Cloud.
+- Smoke-tests and CI validation
+  - Add a minimal CI job that runs the seed script and a smoke-test to validate retrieval + search behavior using GitHub Actions secrets.
+- Developer ergonomics
+  - Keep local development fast: `.env.local` for local creds (gitignored), clear quick-start steps, and npm scripts for seeding/testing.
+
+Short acceptance criteria:
+- Running `npm ci` and `npm run seed-qdrant` (after creating `.env.local`) seeds a test collection in Qdrant Cloud.
+- `src/services/retrieval.service.ts` delegates to `src/lib/qdrant-http.ts`.
+- A smoke-test script verifies top-K results for seeded docs.
+
+These changes are intentionally small and reversible; they reduce friction (no local Docker required for Qdrant) and make CI validation straightforward.
+
 ## Technology Stack
 
 - **Frontend:** Angular 20 (standalone components, signals, zoneless change detection)

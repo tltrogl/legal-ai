@@ -7,6 +7,26 @@ This document describes recommended conventions, file layouts and operational pr
 - Define a minimal manifest / metadata contract for each agent so it can be registered, inspected, and tested consistently.
 - Show recommended patterns for tool integration (e.g., vector DB retrieval, external tools/APIs) and safe handling of secrets.
 
+## Refactor goals & immediate objectives
+This repository is undergoing a small, focused refactor to make agent tooling reliable, reproducible, and safe for local development and CI. The goals below are intentional, small, and testable so automated agents and humans can validate progress.
+
+- Standardize environment handling
+  - Move Node scripts to read secrets from environment variables (use `dotenv` in local dev). Stop importing Angular `.ts` environment modules from Node.
+- Stabilize Qdrant integration
+  - Prefer small, well-documented REST wrappers (`src/lib/qdrant-http.ts`) for short scripts to avoid SDK version friction; ensure `seed-qdrant` works reliably against Qdrant Cloud.
+- Make retrieval reusable and testable
+  - Refactor `RetrievalService` to call the shared wrapper so both backend scripts and frontend backends use the same request shape.
+- Add minimal CI validation for agents
+  - Add a smoke-test job that runs `seed-qdrant` and a minimal retrieval smoke-test in CI using secrets stored in the Actions secrets store.
+- Safety and secrets hygiene
+  - Keep secrets out of the frontend; provide `.env.example` and instruct developers to use `.env.local` (gitignored).
+
+Acceptance criteria (short):
+- `npm run seed-qdrant` completes locally when `.env.local` contains valid Qdrant Cloud creds.
+- `src/lib/qdrant-http.ts` exists and is used by `src/services/retrieval.service.ts`.
+- A minimal smoke-test script (`src/scripts/smoke-test.js`) runs and returns expected top-K ids for seeded docs.
+- CI job exists that runs seed + smoke-test using repository secrets.
+
 ## Audience
 - Engineers building agents that orchestrate LLMs and external tools (retrieval, web calls, DBs) for `legal-ai`.
 - Devops / SRE responsible for deploying and monitoring agents.
