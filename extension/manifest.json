@@ -1,27 +1,44 @@
 {
-    "manifest_version": 3,
-    "name": "Lexi ChatGPT Bridge",
-    "version": "0.1.0",
-    "description": "Bridges the Lexi AI app with ChatGPT web UI for free chat (experimental).",
-    "permissions": [
-        "scripting",
-        "activeTab"
-    ],
-    "host_permissions": [
-        "https://chat.openai.com/*"
-    ],
-    "background": {
-        "service_worker": "background.js"
+  "manifest_version": 3,
+  "name": "Lexi ChatGPT Bridge",
+  "version": "0.2.0",
+  "description": "Bridge Lexi AI with ChatGPT web UI via cross-tab routing (experimental).",
+  "permissions": [
+    "scripting",
+    "activeTab",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://chat.openai.com/*",
+    "https://chatgpt.com/*",
+    "https://*.chatgpt.com/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chat.openai.com/*",
+        "https://chatgpt.com/*",
+        "https://*.chatgpt.com/*"
+      ],
+      "js": [
+        "content-script.js"
+      ],
+      "run_at": "document_end"
     },
-    "content_scripts": [
-        {
-            "matches": [
-                "https://chat.openai.com/*"
-            ],
-            "js": [
-                "content-script.js"
-            ],
-            "run_at": "document_end"
-        }
-    ]
+    {
+      "matches": [
+        "http://localhost/*",
+        "http://127.0.0.1/*"
+      ],
+      "js": [
+        "app-bridge.js"
+      ],
+      "run_at": "document_end"
+    }
+  ]
 }

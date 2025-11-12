@@ -1,81 +1,141 @@
-// Content script injected on ChatGPT pages to enable Lexi bridge
-// Listens for window messages from the Angular app and interacts with ChatGPT DOM
-
+// Runs on ChatGPT pages. Receives requests via background, automates UI, streams replies back.
 (function () {
-    const APP_ORIGIN_ALLOWED = '*'; // adjust if you want stricter origin checks
+  const HEARTBEAT_MS = 10000;
 
-    function postToApp(payload) {
-        window.postMessage(payload, APP_ORIGIN_ALLOWED);
-    }
+  // Register with background as "chatgpt" endpoint
+  chrome.runtime.sendMessage({ type: 'LEXI_REGISTER', role: 'chatgpt' }, () => {
+    console.log('[Lexi CS] Registered on ChatGPT page');
+  });
 
-    function log(...a) {
-        console.log('[Lexi CS]', ...a);
-    }
-
-    // Observe ChatGPT response area for new messages
-    let observer;
-    function startObserver() {
-        const target = document.querySelector('main');
-        if (!target) {
-            log('Main element not found yet, retrying...');
-            setTimeout(startObserver, 1000);
-            return;
-        }
-        observer = new MutationObserver(handleMutations);
-        observer.observe(target, { childList: true, subtree: true });
-        log('MutationObserver started');
-    }
-
-    function extractLatestReply() {
-        // heuristic: last markdown block / message container
-        const containers = document.querySelectorAll('div.markdown, .group div[data-message-author-role="assistant"]');
-        if (containers.length === 0) return null;
-        const last = containers[containers.length - 1];
-        return last.innerText.trim();
-    }
-
-    function handleMutations(mutations) {
-        for (const m of mutations) {
-            if (m.addedNodes && m.addedNodes.length) {
-                const reply = extractLatestReply();
-                if (reply) {
-                    postToApp({ type: 'LEXI_EXTENSION_RESPONSE_CHUNK', chunk: reply });
-                }
-            }
-        }
-    }
-
-    function sendPromptToChatGPT(prompt) {
-        // Find textarea and submit button
-        const textarea = document.querySelector('textarea');
-        if (!textarea) {
-            postToApp({ type: 'LEXI_EXTENSION_ERROR', error: 'Textarea not found' });
-            return;
-        }
-        textarea.value = prompt;
-        textarea.dispatchEvent(new Event('input', { bubbles: true }));
-
-        // Press Enter programmatically
-        const enterEvent = new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true });
-        textarea.dispatchEvent(enterEvent);
-    }
-
-    window.addEventListener('message', (event) => {
-        const { data } = event;
-        if (!data || typeof data !== 'object') return;
-        switch (data.type) {
-            case 'LEXI_EXTENSION_PING':
-                postToApp({ type: 'LEXI_EXTENSION_PONG' });
-                break;
-            case 'LEXI_EXTENSION_SEND_PROMPT':
-                sendPromptToChatGPT(data.prompt || '');
-                break;
-            default:
-                break;
-        }
+  // Emit heartbeat to app (via background router)
+  function heartbeat() {
+    chrome.runtime.sendMessage({
+      router: true,
+      to: 'app',
+      payload: { __LEXI_EXTENSION__: true, type: 'LEXI_EXTENSION_HEARTBEAT' }
     });
+  }
+  heartbeat();
+  setInterval(heartbeat, HEARTBEAT_MS);
 
-    // Initial ready signal
-    postToApp({ type: 'LEXI_EXTENSION_READY' });
-    startObserver();
+  // Active request state by id
+  const active = new Map(); // id -> { lastText: string, doneTimer: any }
+
+  // Utility: extract latest assistant text (heuristic)
+  function extractLatestReply() {
+    const roleNodes = document.querySelectorAll('div[data-message-author-role="assistant"]');
+    let candidate = roleNodes.length ? roleNodes[roleNodes.length - 1] : null;
+    if (!candidate) {
+      const md = document.querySelectorAll('div.markdown');
+      candidate = md.length ? md[md.length - 1] : null;
+    }
+    return candidate ? candidate.innerText.trim() : null;
+  }
+
+  // Diff helper
+  function delta(prev, curr) {
+    if (!prev) return curr;
+    return curr.startsWith(prev) ? curr.slice(prev.length) : curr;
+  }
+
+  // Observe mutations to stream text
+  let observer;
+  function startObserver() {
+    const target = document.querySelector('main') || document.body;
+    if (!target) return setTimeout(startObserver, 750);
+    observer = new MutationObserver(() => {
+      if (active.size === 0) return;
+      const latest = extractLatestReply();
+      if (!latest) return;
+      for (const [id, st] of active.entries()) {
+        const d = delta(st.lastText, latest);
+        if (d) {
+          st.lastText = latest;
+          chrome.runtime.sendMessage({
+            router: true,
+            to: 'app',
+            payload: { __LEXI_EXTENSION__: true, type: 'LEXI_CHAT_RESPONSE_CHUNK', id, textChunk: d }
+          });
+        }
+        clearTimeout(st.doneTimer);
+        st.doneTimer = setTimeout(() => {
+          chrome.runtime.sendMessage({
+            router: true,
+            to: 'app',
+            payload: { __LEXI_EXTENSION__: true, type: 'LEXI_CHAT_RESPONSE_DONE', id }
+          });
+          active.delete(id);
+        }, 2000);
+      }
+    });
+    observer.observe(target, { childList: true, subtree: true });
+    console.log('[Lexi CS] MutationObserver started');
+  }
+  startObserver();
+
+  // Send prompt to ChatGPT UI
+  function sendPromptToChatGPT(prompt) {
+    const textarea = document.querySelector('textarea');
+    const editor = textarea || document.querySelector('[contenteditable="true"]');
+    if (!editor) return false;
+
+    if (textarea) {
+      textarea.value = prompt;
+      textarea.dispatchEvent(new Event('input', { bubbles: true }));
+      textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true }));
+      return true;
+    }
+
+    // contenteditable fallback
+    if (editor && editor.isContentEditable) {
+      editor.focus();
+      const sel = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(editor);
+      range.collapse(false);
+      sel.removeAllRanges();
+      sel.addRange(range);
+      editor.dispatchEvent(new InputEvent('beforeinput', { bubbles: true, inputType: 'insertText', data: prompt }));
+      editor.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true }));
+      return true;
+    }
+    return false;
+  }
+
+  // Receive requests from background (originating from the app)
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (!msg || typeof msg !== 'object') return;
+
+    // Preferred new protocol
+    if (msg.type === 'LEXI_CHAT_REQUEST' && msg.id && Array.isArray(msg.messages)) {
+      const text = msg.messages.map(m => `[${String(m.role || '').toUpperCase()}] ${m.content || ''}`).join('\n\n');
+      if (!sendPromptToChatGPT(text)) {
+        chrome.runtime.sendMessage({
+          router: true,
+          to: 'app',
+          payload: { __LEXI_EXTENSION__: true, type: 'LEXI_CHAT_RESPONSE_ERROR', id: msg.id, error: 'Input not found' }
+        });
+        return;
+      }
+      active.set(msg.id, { lastText: '', doneTimer: null });
+      return;
+    }
+
+    // Legacy compatibility: direct prompt
+    if (msg.type === 'LEXI_EXTENSION_SEND_PROMPT' && typeof msg.prompt === 'string') {
+      sendPromptToChatGPT(msg.prompt);
+      // No id to track; streaming still goes out as chunks without mapping
+      return;
+    }
+
+    // Ping compatibility
+    if (msg.type === 'LEXI_EXTENSION_PING') {
+      chrome.runtime.sendMessage({
+        router: true,
+        to: 'app',
+        payload: { __LEXI_EXTENSION__: true, type: 'LEXI_EXTENSION_HEARTBEAT' }
+      });
+      return;
+    }
+  });
 })();
